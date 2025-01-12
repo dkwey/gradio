@@ -480,7 +480,7 @@ def move_files_to_cache(
         # This makes it so that the URL is not downloaded and speeds up event processing
         if payload.url and postprocess and client_utils.is_http_url_like(payload.url):
             payload.path = payload.url
-        elif utils.is_static_file(payload):
+        elif utils.is_static_file(payload) or Path(payload.path).exists():
             pass
         elif not block.proxy_url:
             # If the file is on a remote server, do not move it to cache.
@@ -600,7 +600,7 @@ async def async_move_files_to_cache(
         # This makes it so that the URL is not downloaded and speeds up event processing
         if payload.url and postprocess and client_utils.is_http_url_like(payload.url):
             payload.path = payload.url
-        elif utils.is_static_file(payload):
+        elif utils.is_static_file(payload) or Path(payload.path).exists():
             pass
         elif not block.proxy_url:
             # If the file is on a remote server, do not move it to cache.
