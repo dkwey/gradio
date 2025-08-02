@@ -11,7 +11,7 @@ import re
 import shutil
 import threading
 import uuid
-from collections import deque
+from collections import defaultdict, deque
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass as python_dataclass
@@ -127,7 +127,7 @@ class Request:
     of this class include: `headers`, `client`, `query_params`, `session_hash`, and `path_params`. If
     auth is enabled, the `username` attribute can be used to get the logged in user. In some environments,
     the dict-like attributes (e.g. `requests.headers`, `requests.query_params`) of this class are automatically
-    converted to to dictionaries, so we recommend converting them to dictionaries before accessing
+    converted to dictionaries, so we recommend converting them to dictionaries before accessing
     attributes for consistent behavior in different environments.
     Example:
         import gradio as gr
@@ -208,6 +208,34 @@ class Request:
         if request_state := state.pop("request_state", None):
             self.state = request_state
         self.__dict__ = state
+
+
+@document()
+class Header(str):
+    """A string that represents a header value in an incoming HTTP request to the Gradio app.
+
+    When you type a function argument of type `Header`, Gradio will automatically extract that header from the request and pass it to the function.
+    Note that it's common for header values to use hyphens, e.g. `x-forwarded-host`, and these will automatically be converted to underscores.
+    So make sure you use underscores in your function arguments.
+
+    Example:
+        import gradio as gr
+
+        def make_api_request_on_behalf_of_user(prompt: str, x_api_token: gr.Header):
+            return "Hello from the API" if not x_api_token else "Hello from the API with token!"
+
+        demo = gr.Interface(
+            make_api_request_on_behalf_of_user,
+            [
+                gr.Textbox(label="Prompt"),
+            ],
+            gr.Textbox(label="Response"),
+        )
+
+        demo.launch(mcp_server=True)
+    """
+
+    pass
 
 
 class FnIndexInferError(Exception):
@@ -353,6 +381,64 @@ async def call_process_api(
     return output
 
 
+def get_first_header_value(request: fastapi.Request, header_name: str):
+    header_value = request.headers.get(header_name)
+    if header_value:
+        return header_value.split(",")[0].strip()
+    return None
+
+
+def get_request_origin(request: fastapi.Request, route_path: str) -> httpx.URL:
+    """
+    Examines the request headers to determine the origin of the request.
+    If the request includes the x-forwarded-host header, it is used directly to determine the origin.
+    Otherwise, the request url is used and the route path is stripped off.
+
+    The returned URL is a httpx.URL object without a trailing slash, e.g. "https://example.com"
+    """
+    x_forwarded_host = get_first_header_value(request, "x-forwarded-host")
+    root_url = f"http://{x_forwarded_host}" if x_forwarded_host else str(request.url)
+    root_url = httpx.URL(root_url)
+    root_url = root_url.copy_with(query=None)
+    root_url = str(root_url).rstrip("/")
+    if get_first_header_value(request, "x-forwarded-proto") == "https":
+        root_url = root_url.replace("http://", "https://")
+
+    route_path = route_path.rstrip("/")
+    if len(route_path) > 0 and not x_forwarded_host:
+        root_url = root_url[: -len(route_path)]
+    root_url = root_url.rstrip("/")
+    root_url = httpx.URL(root_url)
+    return root_url
+
+
+def get_api_call_path(request: fastapi.Request) -> str:
+    """
+    Extracts the API call path from the request URL.
+
+    If the URL (without query parameters) ends with "{API_PREFIX}/queue/join", that exact path is returned.
+    Otherwise, if the URL contains "{API_PREFIX}/call", the substring starting from "{API_PREFIX}/call" is returned.
+    This allows for dynamic API calls to methods other than "predict".
+
+    Raises:
+        ValueError: If the request URL does not match any recognized API call pattern.
+    """
+    queue_api_url = f"{API_PREFIX}/queue/join"
+    generic_api_url = f"{API_PREFIX}/call"
+    request_path = request.url.path.rstrip("/")
+
+    if request_path.endswith(queue_api_url):
+        return queue_api_url
+
+    start_index = request_path.rfind(generic_api_url)
+    if start_index >= 0:
+        return request_path[start_index : len(request_path)]
+
+    raise ValueError(
+        f"Request url '{str(request.url)}' has an unknown api call pattern."
+    )
+
+
 def get_root_url(
     request: fastapi.Request, route_path: str, root_path: str | None
 ) -> str:
@@ -370,29 +456,11 @@ def get_root_url(
     And if there are multiple hosts in the x-forwarded-host or multiple protocols in the x-forwarded-proto, the first one is used.
     """
 
-    def get_first_header_value(header_name: str):
-        header_value = request.headers.get(header_name)
-        if header_value:
-            return header_value.split(",")[0].strip()
-        return None
-
     if root_path and client_utils.is_http_url_like(root_path):
         return root_path.rstrip("/")
 
-    x_forwarded_host = get_first_header_value("x-forwarded-host")
-    root_url = f"http://{x_forwarded_host}" if x_forwarded_host else str(request.url)
-    root_url = httpx.URL(root_url)
-    root_url = root_url.copy_with(query=None)
-    root_url = str(root_url).rstrip("/")
-    if get_first_header_value("x-forwarded-proto") == "https":
-        root_url = root_url.replace("http://", "https://")
+    root_url = get_request_origin(request, route_path)
 
-    route_path = route_path.rstrip("/")
-    if len(route_path) > 0 and not x_forwarded_host:
-        root_url = root_url[: -len(route_path)]
-    root_url = root_url.rstrip("/")
-
-    root_url = httpx.URL(root_url)
     if root_path and root_url.path != root_path:
         root_url = root_url.copy_with(path=root_path)
 
@@ -445,10 +513,15 @@ class FileUploadProgressNotQueuedError(Exception):
 class FileUploadProgress:
     def __init__(self) -> None:
         self._statuses: dict[str, FileUploadProgressTracker] = {}
+        self._signals = defaultdict(asyncio.Event)
 
     def track(self, upload_id: str):
         if upload_id not in self._statuses:
             self._statuses[upload_id] = FileUploadProgressTracker(deque(), False)
+            self._signals[upload_id].set()
+
+    async def is_tracked(self, upload_id: str) -> bool:
+        return await self._signals[upload_id].wait()
 
     def append(self, upload_id: str, filename: str, message_bytes: bytes):
         if upload_id not in self._statuses:
@@ -504,7 +577,7 @@ class GradioMultiPartParser:
 
     """
 
-    max_file_size = 1024 * 1024
+    max_header_size = 1024 * 8
 
     def __init__(
         self,
@@ -516,6 +589,7 @@ class GradioMultiPartParser:
         upload_id: str | None = None,
         upload_progress: FileUploadProgress | None = None,
         max_file_size: int | float,
+        max_header_size: int = max_header_size,
     ) -> None:
         self.headers = headers
         self.stream = stream
@@ -527,8 +601,10 @@ class GradioMultiPartParser:
         self._current_files = 0
         self._current_fields = 0
         self.max_file_size = max_file_size
+        self.max_header_size = max_header_size
         self._current_partial_header_name: bytes = b""
         self._current_partial_header_value: bytes = b""
+        self._current_header_size: int = 0
         self._current_part = MultipartPart()
         self._charset = ""
         self._file_parts_to_write: list[tuple[MultipartPart, bytes]] = []
@@ -537,6 +613,7 @@ class GradioMultiPartParser:
 
     def on_part_begin(self) -> None:
         self._current_part = MultipartPart()
+        self._current_header_size = 0
 
     def on_part_data(self, data: bytes, start: int, end: int) -> None:
         message_bytes = data[start:end]
@@ -566,11 +643,23 @@ class GradioMultiPartParser:
             # self.items is used in the return value.
             self.items.append((self._current_part.field_name, self._current_part.file))
 
+    def _check_header_size(self, additional_bytes: int):
+        if self._current_header_size + additional_bytes > self.max_header_size:
+            raise MultiPartException(
+                f"Headers exceeded maximum allowed size of {self.max_header_size} bytes."
+            )
+
     def on_header_field(self, data: bytes, start: int, end: int) -> None:
+        additional_header_bytes = end - start
+        self._check_header_size(additional_header_bytes)
         self._current_partial_header_name += data[start:end]
+        self._current_header_size += additional_header_bytes
 
     def on_header_value(self, data: bytes, start: int, end: int) -> None:
+        additional_header_bytes = end - start
+        self._check_header_size(additional_header_bytes)
         self._current_partial_header_value += data[start:end]
+        self._current_header_size += additional_header_bytes
 
     def on_header_end(self) -> None:
         field = self._current_partial_header_name.lower()
@@ -590,7 +679,7 @@ class GradioMultiPartParser:
             )
         except KeyError as e:
             raise MultiPartException(
-                'The Content-Disposition header field "name" must be ' "provided."
+                'The Content-Disposition header field "name" must be provided.'
             ) from e
         if b"filename" in options:
             self._current_files += 1
@@ -655,14 +744,14 @@ class GradioMultiPartParser:
                 # the main thread.
                 for part, data in self._file_parts_to_write:
                     assert part.file  # for type checkers  # noqa: S101
-                    await part.file.write(data)
-                    part.file.sha.update(data)  # type: ignore
-                    if os.stat(part.file.file.name).st_size > self.max_file_size:
+                    if (part.file.size or 0) + len(data) > self.max_file_size:
                         if self.upload_progress is not None:
                             self.upload_progress.set_done(self.upload_id)  # type: ignore
                         raise MultiPartException(
                             f"File size exceeded maximum allowed size of {self.max_file_size} bytes."
                         )
+                    await part.file.write(data)
+                    part.file.sha.update(data)  # type: ignore
                 for part in self._file_parts_to_finish:
                     assert part.file  # for type checkers  # noqa: S101
                     await part.file.seek(0)
@@ -844,6 +933,7 @@ class CustomCORSMiddleware:
 def delete_files_created_by_app(blocks: Blocks, age: int | None) -> None:
     """Delete files that are older than age. If age is None, delete all files."""
     dont_delete = set()
+
     for component in blocks.blocks.values():
         dont_delete.update(getattr(component, "keep_in_cache", set()))
     for temp_set in blocks.temp_file_sets:
@@ -906,13 +996,14 @@ def create_lifespan_handler(
 
     @asynccontextmanager
     async def _handler(app: App):
+        state = None
         async with AsyncExitStack() as stack:
             await stack.enter_async_context(_delete_state_handler(app))
             if frequency and age:
                 await stack.enter_async_context(_lifespan_handler(app, frequency, age))
             if user_lifespan is not None:
-                await stack.enter_async_context(user_lifespan(app))
-            yield
+                state = await stack.enter_async_context(user_lifespan(app))
+            yield state
 
     return _handler
 
@@ -937,3 +1028,13 @@ class MediaStream:
 
     def end_stream(self):
         self.ended = True
+
+
+def create_url_safe_hash(data: bytes, digest_size=8):
+    """Create a URL-safe short hash of the data. Used to generate unique short deep links."""
+    import base64
+
+    hash_obj = hashlib.blake2b(data, digest_size=digest_size, usedforsecurity=False)
+    url_safe_hash = base64.urlsafe_b64encode(hash_obj.digest()).decode().rstrip("=")
+
+    return url_safe_hash

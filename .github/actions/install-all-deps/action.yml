@@ -54,10 +54,17 @@ runs:
       run: |
         python -m pip install --upgrade virtualenv
         python -m virtualenv venv
-    - name: Install uv
+    - name: Install uv (linux)
+      if: ${{ inputs.os == 'ubuntu-latest' }}
       shell: bash
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    - name: Install uv (windows)
+      if: ${{ inputs.os == 'windows-latest' }}
+      shell: bash
+      run: |
+        powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
     - uses: actions/cache@v4
       id: cache
@@ -82,7 +89,7 @@ runs:
       run: |
         . ${{ env.VENV_ACTIVATE }}
         uv pip install -e client/python
-        uv pip install -e ".[oauth]"
+        uv pip install -e ".[oauth, mcp]"
     - name: install-frontend
       uses: "gradio-app/gradio/.github/actions/install-frontend-deps@main"
       with:
@@ -93,4 +100,4 @@ runs:
       if: inputs.os == 'ubuntu-latest'
       run: |
         . ${{ env.VENV_ACTIVATE }}
-        uv pip install boto3 && python js/_website/generate_jsons/generate.py
+        uv pip install boto3 markdown && python js/_website/generate_jsons/generate.py

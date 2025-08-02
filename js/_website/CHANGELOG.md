@@ -1,5 +1,355 @@
 # website
 
+## 0.60.2
+
+### Dependency updates
+
+- @gradio/code@0.14.12
+
+## 0.60.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.15
+- @gradio/code@0.14.11
+- @gradio/paramviewer@0.7.13
+
+## 0.60.0
+
+### Features
+
+- [#11427](https://github.com/gradio-app/gradio/pull/11427) [`6b2bcd0`](https://github.com/gradio-app/gradio/commit/6b2bcd097ae5ef999a7fb273ecf7c7e4c0eab305) - Improve load times of the Gradio front-end.  Thanks @pngwn!
+- [#11505](https://github.com/gradio-app/gradio/pull/11505) [`3c20f9f`](https://github.com/gradio-app/gradio/commit/3c20f9f1007f8b7b305c92bbcbb95d2c44ee17ad) - Add back theme.css to fix website build.  Thanks @aliabd!
+- [#11517](https://github.com/gradio-app/gradio/pull/11517) [`40c87f1`](https://github.com/gradio-app/gradio/commit/40c87f180759434367538506df8310769d99346a) - Add more hackathon winners to gallery.  Thanks @aliabd!
+
+### Fixes
+
+- [#11430](https://github.com/gradio-app/gradio/pull/11430) [`4d4cd4b`](https://github.com/gradio-app/gradio/commit/4d4cd4b08d6daafc66e0189a2b274916da00d480) - fix exports + add browser build.  Thanks @pngwn!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.14
+- @gradio/tabs@0.4.5
+- @gradio/tabitem@0.5.0
+- @gradio/code@0.14.10
+- @gradio/paramviewer@0.7.12
+
+## 0.59.0
+
+### Features
+
+- [#11437](https://github.com/gradio-app/gradio/pull/11437) [`7d98414`](https://github.com/gradio-app/gradio/commit/7d984145e7c0051424cd3f8f20152703966192b9) - Add support for markdown in tips and warnings.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/tabitem@0.4.6
+- @gradio/code@0.14.9
+
+## 0.58.0
+
+### Features
+
+- [#11410](https://github.com/gradio-app/gradio/pull/11410) [`8607c35`](https://github.com/gradio-app/gradio/commit/8607c35acf75661ae6b9ac5acc81071796e6b681) - Add gallery of hackathon winners to the website.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/code@0.14.8
+- @gradio/paramviewer@0.7.11
+- @gradio/statustracker@0.10.13
+
+## 0.57.4
+
+### Fixes
+
+- [#11370](https://github.com/gradio-app/gradio/pull/11370) [`992f84b`](https://github.com/gradio-app/gradio/commit/992f84bc0147ebacbf76bc6ca7d931ccdeb06839) - Fix zerogu-guide.  Thanks @freddyaboulton!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+- @gradio/code@0.14.7
+- @gradio/paramviewer@0.7.10
+- @gradio/tabitem@0.4.5
+- @gradio/tabs@0.4.5
+
+## 0.57.3
+
+### Dependency updates
+
+- @gradio/code@0.14.7
+
+## 0.57.2
+
+### Dependency updates
+
+- @gradio/tabs@0.4.5
+- @gradio/tabitem@0.4.5
+- @gradio/code@0.14.6
+
+## 0.57.1
+
+### Fixes
+
+- [#11315](https://github.com/gradio-app/gradio/pull/11315) [`86f2feb`](https://github.com/gradio-app/gradio/commit/86f2feb20b406fb9b7357c8ce2d2ffb69c21c1b6) - Update tweets on the landing page.  Thanks @aliabd!
+
+## 0.57.0
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.57.0
+
+### Features
+
+- [#11268](https://github.com/gradio-app/gradio/pull/11268) [`7bf3161`](https://github.com/gradio-app/gradio/commit/7bf3161c0688e664053b9288a3867d001a306ba0) - Add hackathon to website banner.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+- @gradio/code@0.14.5
+- @gradio/paramviewer@0.7.10
+
+## 0.56.2
+
+### Dependency updates
+
+- @gradio/code@0.14.4
+- @gradio/paramviewer@0.7.9
+- @gradio/statustracker@0.10.11
+
+## 0.56.1
+
+### Features
+
+- [#11173](https://github.com/gradio-app/gradio/pull/11173) [`d023b2e`](https://github.com/gradio-app/gradio/commit/d023b2e2ffdf872f531e22b0310bc7855a756c7d) - Adds docs for `gr.api()` which were previously missing from the website.  Thanks @abidlabs!
+
+### Dependency updates
+
+- @gradio/tabs@0.4.4
+- @gradio/tabitem@0.4.4
+
+## 0.56.0
+
+### Features
+
+- [#11120](https://github.com/gradio-app/gradio/pull/11120) [`b2118d4`](https://github.com/gradio-app/gradio/commit/b2118d4b613f93b34e02c809e7d0faaa7545b875) - Docs mcp server.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/code@0.14.3
+
+## 0.55.0
+
+### Features
+
+- [#11027](https://github.com/gradio-app/gradio/pull/11027) [`eff532b`](https://github.com/gradio-app/gradio/commit/eff532b913a3c8f06f10a4f9471d3177e3744053) - Add new `ImageSlider` component.  Thanks @pngwn!
+
+### Dependency updates
+
+- @gradio/code@0.14.2
+- @gradio/paramviewer@0.7.8
+- @gradio/statustracker@0.10.10
+
+## 0.54.2
+
+### Fixes
+
+- [#11005](https://github.com/gradio-app/gradio/pull/11005) [`3def0ed`](https://github.com/gradio-app/gradio/commit/3def0ed9edc5a9194d69456948324ec4e2740b7d) - Ensure that the `.select()` event in `gr.DataFrame` carries the `.row_value` and `.col_value`.  Thanks @abidlabs!
+
+### Dependency updates
+
+- @gradio/code@0.14.1
+- @gradio/paramviewer@0.7.7
+- @gradio/statustracker@0.10.9
+- @gradio/tabitem@0.4.3
+- @gradio/tabs@0.4.3
+
+## 0.54.1
+
+### Features
+
+- [#10966](https://github.com/gradio-app/gradio/pull/10966) [`191b936`](https://github.com/gradio-app/gradio/commit/191b936c9233d20fa5d83de0d7101688209df8eb) - Load lite js correctly in playground.  Thanks @aliabd!
+
+### Fixes
+
+- [#10979](https://github.com/gradio-app/gradio/pull/10979) [`975feee`](https://github.com/gradio-app/gradio/commit/975feee3925e5b65e52ae00da5c5066d8889ae6a) - improve webcam options for the ImageEditor.  Thanks @pngwn!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.8
+- @gradio/code@0.14.0
+- @gradio/paramviewer@0.7.6
+
+## 0.54.0
+
+### Features
+
+- [#10635](https://github.com/gradio-app/gradio/pull/10635) [`2f68c9d`](https://github.com/gradio-app/gradio/commit/2f68c9d988dcbc53a0b8e53bdb1de49c9c8c65d8) - Refactor and redesign `ImageEditor` component.  Thanks @pngwn!
+- [#10952](https://github.com/gradio-app/gradio/pull/10952) [`a8dc9f4`](https://github.com/gradio-app/gradio/commit/a8dc9f469ba49eb1f39f81e8c5c3b4acc7cd482c) - update website banner with 1m MAU announcement.  Thanks @yvrjsharma!
+- [#10936](https://github.com/gradio-app/gradio/pull/10936) [`e8b8eef`](https://github.com/gradio-app/gradio/commit/e8b8eef7e5cb4474fcc109aee871e006d7dd17f3) - Fix broken css on some param tables.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/code@0.13.2
+- @gradio/paramviewer@0.7.5
+- @gradio/statustracker@0.10.7
+
+## 0.53.2
+
+### Features
+
+- [#10845](https://github.com/gradio-app/gradio/pull/10845) [`2521e8a`](https://github.com/gradio-app/gradio/commit/2521e8a1c76fe77253156bf8465500b9cb1db5c4) - Check if SharedWorker is available in the current runtime and fallback to DedicatedWorker if not available.  Thanks @whitphx!
+- [#10926](https://github.com/gradio-app/gradio/pull/10926) [`d81385b`](https://github.com/gradio-app/gradio/commit/d81385bdb939a81718339b806f0c3f71d64f6dc5) - Add status docs to MetadataDict.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/code@0.13.1
+
+## 0.53.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.6
+- @gradio/code@0.13.0
+- @gradio/paramviewer@0.7.4
+
+## 0.53.0
+
+### Features
+
+- [#10733](https://github.com/gradio-app/gradio/pull/10733) [`731ab92`](https://github.com/gradio-app/gradio/commit/731ab92001c88d4cf1062acf0a4f1108a4513014) - Autocompletion on code editor component.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.5
+- @gradio/code@0.12.0
+- @gradio/paramviewer@0.7.3
+
+## 0.52.0
+
+### Features
+
+- [#10744](https://github.com/gradio-app/gradio/pull/10744) [`a89fa28`](https://github.com/gradio-app/gradio/commit/a89fa288f42022bb489bac655562a8d1eb5030a5) - Add missing docs and fix gaps in website.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/code@0.11.2
+
+## 0.51.0
+
+### Features
+
+- [#10677](https://github.com/gradio-app/gradio/pull/10677) [`92d5ac8`](https://github.com/gradio-app/gradio/commit/92d5ac8e67147e1dd7a701cc8c3e2a5193e832c6) - Static llms.txt route on the website.  Thanks @aliabd!
+
+## 0.50.4
+
+### Dependency updates
+
+- @gradio/code@0.11.1
+
+## 0.50.3
+
+### Features
+
+- [#10670](https://github.com/gradio-app/gradio/pull/10670) [`a15964d`](https://github.com/gradio-app/gradio/commit/a15964db8772d3cb34e730e75866c5d7460199ab) - Update banner to point to FastRTC.  Thanks @abidlabs!
+
+## 0.50.2
+
+### Fixes
+
+- [#10669](https://github.com/gradio-app/gradio/pull/10669) [`d1b063f`](https://github.com/gradio-app/gradio/commit/d1b063fb0c9d893062d9b47919ed1ba9241a6e07) - Add load_chat documentation.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/code@0.11.0
+
+## 0.50.1
+
+### Dependency updates
+
+- @gradio/code@0.10.18
+- @gradio/paramviewer@0.7.2
+- @gradio/statustracker@0.10.4
+
+## 0.50.0
+
+### Features
+
+- [#10511](https://github.com/gradio-app/gradio/pull/10511) [`c4aa886`](https://github.com/gradio-app/gradio/commit/c4aa8864dabec4caeb59af91f6f1aaaf50e33b67) - Semantic search in the playground.  Thanks @aliabd!
+
+## 0.49.0
+
+### Features
+
+- [#10552](https://github.com/gradio-app/gradio/pull/10552) [`ed25a10`](https://github.com/gradio-app/gradio/commit/ed25a1053a55ddd2cf7d3067c72bdf77185ada8d) - Add 1920px wide resolution for wide monitors.  Thanks @Oncorporation!
+
+### Fixes
+
+- [#10510](https://github.com/gradio-app/gradio/pull/10510) [`71e4cd4`](https://github.com/gradio-app/gradio/commit/71e4cd483e9b43b2aa770db9f834036bb70f9420) - Fixed wrong example usage of docs/gradio/selectdata.  Thanks @PatZer0!
+
+### Dependency updates
+
+- @gradio/code@0.10.17
+- @gradio/paramviewer@0.7.1
+- @gradio/statustracker@0.10.3
+- @gradio/tabitem@0.4.2
+- @gradio/tabs@0.4.2
+
+## 0.48.0
+
+### Features
+
+- [#10480](https://github.com/gradio-app/gradio/pull/10480) [`90f90b7`](https://github.com/gradio-app/gradio/commit/90f90b7989081b0e4422384ee699cb98781723d1) - Add sidebar to the docs.  Thanks @aliabd!
+- [#10495](https://github.com/gradio-app/gradio/pull/10495) [`35fda36`](https://github.com/gradio-app/gradio/commit/35fda36de9745757298cafb3d8b91cbc1a4358c9) - Add an `anchor_links` parameter to `gr.ParamViewer` that allows linking to specific parameters.  Thanks @abidlabs!
+
+### Dependency updates
+
+- @gradio/paramviewer@0.7.0
+- @gradio/code@0.10.16
+
+## 0.47.3
+
+### Dependency updates
+
+- @gradio/code@0.10.15
+
+## 0.47.2
+
+### Features
+
+- [#10443](https://github.com/gradio-app/gradio/pull/10443) [`f40747c`](https://github.com/gradio-app/gradio/commit/f40747c9fd12d160ac9f7b3c5273be6be815efac) - Fix error with website build in chatbot.svx.  Thanks @aliabd!
+
+### Dependency updates
+
+- @gradio/code@0.10.14
+
+## 0.47.1
+
+### Fixes
+
+- [#10419](https://github.com/gradio-app/gradio/pull/10419) [`efd358a`](https://github.com/gradio-app/gradio/commit/efd358a54a0f3ec0b201f17f3d61a2b28a733bc1) - Update chatbot.svx for issue#10413.  Thanks @NewJerseyStyle!
+
+## 0.47.0
+
+### Features
+
+- [#10392](https://github.com/gradio-app/gradio/pull/10392) [`4d47e4b`](https://github.com/gradio-app/gradio/commit/4d47e4b4e2f07d4dd5b600f7d9180c7ad3e67a1f) - Add a `log` parameter to Chatbot metadata that allows displaying `str` content next to the thought title.  Thanks @abidlabs!
+- [#10346](https://github.com/gradio-app/gradio/pull/10346) [`43e05d7`](https://github.com/gradio-app/gradio/commit/43e05d72f43c9ac8dc18e4b885c9da08605b09e6) - Document additional helper classes for `gr.Chatbot`.  Thanks @abidlabs!
+- [#10388](https://github.com/gradio-app/gradio/pull/10388) [`812f2d8`](https://github.com/gradio-app/gradio/commit/812f2d8a3f6956546d7aae53ab3ee36f0c9f2857) - Playground fixes and refactoring.  Thanks @aliabd!
+- [#10355](https://github.com/gradio-app/gradio/pull/10355) [`070cab5`](https://github.com/gradio-app/gradio/commit/070cab5d2e5fd3aabf4b1020e46b892446308ace) - Expand token length for existing code and prompt in playground.  Thanks @aliabd!
+
+### Fixes
+
+- [#10404](https://github.com/gradio-app/gradio/pull/10404) [`9dc5d15`](https://github.com/gradio-app/gradio/commit/9dc5d157aaf002f7699d3b2c1652f49d47e53e80) - Tweak behavior related to the `status` of `gr.Chatbot` thought messages.  Thanks @abidlabs!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.2
+- @gradio/tabitem@0.4.1
+- @gradio/tabs@0.4.1
+- @gradio/code@0.10.13
+- @gradio/paramviewer@0.6.4
+
 ## 0.46.0
 
 ### Features

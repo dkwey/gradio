@@ -1,5 +1,150 @@
 # @gradio/markdown
 
+## 0.13.18
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.15
+
+## 0.13.17
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+- @gradio/statustracker@0.10.14
+- @gradio/markdown-code@0.5.0
+
+## 0.13.16
+
+### Fixes
+
+- [#11387](https://github.com/gradio-app/gradio/pull/11387) [`8245afc`](https://github.com/gradio-app/gradio/commit/8245afc669501e1e5f0d619f452455f68a3b7667) - Define root URL in frontend.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.13
+- @gradio/markdown-code@0.4.4
+- @gradio/atoms@0.16.2
+
+## 0.13.15
+
+### Dependency updates
+
+- @gradio/markdown-code@0.4.3
+- @gradio/statustracker@0.10.12
+
+## 0.13.15
+
+### Features
+
+- [#11380](https://github.com/gradio-app/gradio/pull/11380) [`0b2b6cb`](https://github.com/gradio-app/gradio/commit/0b2b6cbd44562a2f5843af872fe6761c5f255185) - Truncate textbox examples to 70 chars.  Thanks @hannahblair!
+
+## 0.13.14
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+- @gradio/markdown-code@0.4.3
+
+## 0.13.14
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.13.13
+
+### Fixes
+
+- [#11236](https://github.com/gradio-app/gradio/pull/11236) [`3a7750c`](https://github.com/gradio-app/gradio/commit/3a7750cb8e0f5f860c72db9ab02f7ce4d324d6c5) - Add padding param to gr.Markdown.  Thanks @hannahblair!
+
+## 0.13.12
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+- @gradio/atoms@0.16.1
+
+## 0.13.11
+
+### Fixes
+
+- [#11113](https://github.com/gradio-app/gradio/pull/11113) [`c32f8de`](https://github.com/gradio-app/gradio/commit/c32f8de99a6ab3a82da2f8d5f9f3176a04129f77) - Fix markdown change event.  Thanks @freddyaboulton!
+
+## 0.13.10
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+- @gradio/atoms@0.16.0
+
+## 0.13.9
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/atoms@0.15.2
+- @gradio/markdown-code@0.4.3
+- @gradio/utils@0.10.2
+
+## 0.13.8
+
+### Dependency updates
+
+- @gradio/atoms@0.15.1
+- @gradio/statustracker@0.10.8
+- @gradio/icons@0.12.0
+
+## 0.13.7
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.7
+- @gradio/atoms@0.15.0
+- @gradio/icons@0.11.0
+
+## 0.13.6
+
+### Features
+
+- [#10854](https://github.com/gradio-app/gradio/pull/10854) [`1649b00`](https://github.com/gradio-app/gradio/commit/1649b0038482402d7f0ccdbf86ba65d82b4a12c9) - Add support for `mermaid.js` in `Markdown` component (as well as components like `gr.Chatbot` that use Markdown).  Thanks @abidlabs!
+
+### Dependency updates
+
+- @gradio/atoms@0.14.1
+- @gradio/statustracker@0.10.6
+- @gradio/markdown-code@0.4.2
+
+## 0.13.5
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.5
+- @gradio/atoms@0.14.0
+- @gradio/markdown-code@0.4.1
+
+## 0.13.4
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.4
+- @gradio/atoms@0.13.3
+
+## 0.13.3
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.3
+- @gradio/atoms@0.13.2
+- @gradio/utils@0.10.1
+- @gradio/markdown-code@0.4.0
+
+## 0.13.2
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.2
+
 ## 0.13.1
 
 ### Dependency updates

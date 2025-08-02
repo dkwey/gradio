@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import time
-import warnings
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -23,7 +22,10 @@ if TYPE_CHECKING:
 @document()
 class LoginButton(Button):
     """
-    Creates a button that redirects the user to Sign with Hugging Face using OAuth.
+    Creates a button that redirects the user to Sign with Hugging Face using OAuth. If
+    created inside of a Blocks context, it will add an event to check if the user is logged in
+    and update the button text accordingly. If created outside of a Blocks context, call the
+    `LoginButton.activate()` method to add the event.
     """
 
     is_template = True
@@ -44,7 +46,8 @@ class LoginButton(Button):
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
-        key: int | str | None = None,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = "value",
         scale: int | None = None,
         min_width: int | None = None,
     ):
@@ -67,15 +70,12 @@ class LoginButton(Button):
             elem_classes=elem_classes,
             render=render,
             key=key,
+            preserved_by_key=preserved_by_key,
             scale=scale,
             min_width=min_width,
         )
         if get_blocks_context():
             self.activate()
-        else:
-            warnings.warn(
-                "LoginButton created outside of a Blocks context. May not work unless you call its `activate()` method manually."
-            )
 
     def activate(self):
         # Taken from https://cmgdo.com/external-link-in-gradio-button/
@@ -83,7 +83,7 @@ class LoginButton(Button):
         # ('self' value will be either "Sign in with Hugging Face" or "Signed in as ...")
         _js = _js_handle_redirect.replace(
             "BUTTON_DEFAULT_VALUE", json.dumps(self.value)
-        )
+        ).replace("REDIRECT_URL", self.page)
         self.click(fn=None, inputs=[self], outputs=None, js=_js)
 
         self.attach_load_event(self._check_login_status, None)
@@ -115,7 +115,7 @@ class LoginButton(Button):
 # on the same tab.
 _js_handle_redirect = """
 (buttonValue) => {
-    uri = buttonValue === BUTTON_DEFAULT_VALUE ? '/login/huggingface' : '/logout';
+    uri = buttonValue === BUTTON_DEFAULT_VALUE ? '/login/huggingface?_target_url=/REDIRECT_URL' : '/logout?_target_url=/REDIRECT_URL';
     window.parent?.postMessage({ type: "SET_SCROLLING", enabled: true }, "*");
     setTimeout(() => {
         window.location.assign(uri + window.location.search);

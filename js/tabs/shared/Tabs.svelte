@@ -7,6 +7,7 @@
 		elem_id: string | undefined;
 		visible: boolean;
 		interactive: boolean;
+		scale: number | null;
 	}
 </script>
 
@@ -60,6 +61,7 @@
 
 			if ($selected_tab === false && tab.visible && tab.interactive) {
 				$selected_tab = tab.id;
+				$selected_tab_index = order;
 			}
 			return order;
 		},
@@ -153,6 +155,9 @@
 		});
 		return tab_sizes;
 	}
+
+	$: tab_scale =
+		tabs[$selected_tab_index >= 0 ? $selected_tab_index : 0]?.scale;
 </script>
 
 <svelte:window
@@ -160,7 +165,12 @@
 	on:click={handle_outside_click}
 />
 
-<div class="tabs {elem_classes.join(' ')}" class:hide={!visible} id={elem_id}>
+<div
+	class="tabs {elem_classes.join(' ')}"
+	class:hide={!visible}
+	id={elem_id}
+	style:flex-grow={tab_scale}
+>
 	{#if has_tabs}
 		<div class="tab-wrapper">
 			<div class="tab-container visually-hidden" aria-hidden="true">
@@ -191,14 +201,14 @@
 								}
 							}}
 						>
-							{t.label}
+							{t?.label !== undefined ? t?.label : "Tab " + (i + 1)}
 						</button>
 					{/if}
 				{/each}
 			</div>
 			<span
 				class="overflow-menu"
-				class:hide={!is_overflowing}
+				class:hide={!is_overflowing || !overflow_tabs.some((t) => t?.visible)}
 				bind:this={overflow_menu}
 			>
 				<button
@@ -210,12 +220,14 @@
 				</button>
 				<div class="overflow-dropdown" class:hide={!overflow_menu_open}>
 					{#each overflow_tabs as t}
-						<button
-							on:click={() => change_tab(t?.id)}
-							class:selected={t?.id === $selected_tab}
-						>
-							{t?.label}
-						</button>
+						{#if t?.visible}
+							<button
+								on:click={() => change_tab(t?.id)}
+								class:selected={t?.id === $selected_tab}
+							>
+								{t?.label}
+							</button>
+						{/if}
 					{/each}
 				</div>
 			</span>

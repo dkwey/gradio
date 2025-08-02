@@ -8,12 +8,12 @@ from typing import Any
 
 from gradio_client.documentation import document
 
-from gradio.components.base import Component
+from gradio.components.base import FormComponent
 from gradio.events import Events
 
 
 @document()
-class BrowserState(Component):
+class BrowserState(FormComponent):
     EVENTS = [Events.change]
     """
     Special component that stores state in the browser's localStorage in an encrypted format.
@@ -41,6 +41,8 @@ class BrowserState(Component):
         self.storage_key = storage_key or "".join(
             secrets.choice(string.ascii_letters + string.digits) for _ in range(16)
         )
+        self._value_description = "any json-serializable value"
+
         super().__init__(render=render)
 
     def preprocess(self, payload: Any) -> Any:
@@ -50,6 +52,8 @@ class BrowserState(Component):
         Returns:
             Passes value through unchanged
         """
+        if payload is None:
+            return self.default_value
         return payload
 
     def postprocess(self, value: Any) -> Any:

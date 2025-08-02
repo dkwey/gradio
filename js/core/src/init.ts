@@ -1,4 +1,5 @@
 import { writable, type Writable, get } from "svelte/store";
+import { dequal } from "dequal";
 
 import type {
 	ComponentMeta,
@@ -28,8 +29,15 @@ const raf = is_browser
  * Create a store with the layout and a map of targets
  * @returns A store with the layout and a map of targets
  */
-let has_run = new Set<number>();
-export function create_components(initial_layout: ComponentMeta | undefined): {
+export function create_components(
+	{
+		initial_layout = undefined
+	}: {
+		initial_layout: ComponentMeta | undefined;
+	} = {
+		initial_layout: undefined
+	}
+): {
 	layout: Writable<ComponentMeta>;
 	targets: Writable<TargetMap>;
 	update_value: (updates: UpdateTransaction[]) => void;
@@ -56,6 +64,7 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		root: string;
 		dependencies: Dependency[];
 	}) => void;
+	value_change: (cb: (id: number, value: any) => void) => void;
 } {
 	let _component_map: Map<number, ComponentMeta>;
 
@@ -70,8 +79,18 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 	const layout_store: Writable<ComponentMeta> = writable(initial_layout);
 	let _components: ComponentMeta[] = [];
 	let app: client_return;
-	let keyed_component_values: Record<string | number, any> = {};
+	let keys_per_render_id: Record<number, (string | number)[]> = {};
 	let _rootNode: ComponentMeta;
+
+	let value_change_cb: ((id: number, value: any) => void) | null = null;
+
+	function value_change(cb: (id: number, value: any) => void): void {
+		value_change_cb = cb;
+	}
+
+	// Store current layout and root for dynamic visibility recalculation
+	let current_layout: LayoutNode;
+	let current_root: string;
 
 	function set_event_specific_args(dependencies: Dependency[]): void {
 		dependencies.forEach((dep) => {
@@ -106,7 +125,21 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		// make sure the state is settled before proceeding
 		flush();
 		app = _app;
-		store_keyed_values(_components);
+
+		if (instance_map) {
+			// re-render in reload mode
+			components.forEach((c) => {
+				if (c.props.value == null && c.key) {
+					// If the component has a key, we preserve its value by finding a matching instance with the same key
+					const matching_instance = Object.values(instance_map).find(
+						(instance) => instance.key === c.key
+					);
+					if (matching_instance) {
+						c.props.value = matching_instance.props.value;
+					}
+				}
+			});
+		}
 
 		_components = components;
 		inputs = new Set();
@@ -114,8 +147,11 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		pending_updates = [];
 		constructor_map = new Map();
 		_component_map = new Map();
-
 		instance_map = {};
+
+		// Store current layout and root for dynamic visibility recalculation
+		current_layout = layout;
+		current_root = root;
 
 		_rootNode = {
 			id: layout.id,
@@ -131,7 +167,11 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		components.push(_rootNode);
 
 		dependencies.forEach((dep) => {
-			loading_status.register(dep.id, dep.inputs, dep.outputs);
+			loading_status.register(
+				dep.id,
+				dep.inputs,
+				dep.show_progress_on || dep.outputs
+			);
 			dep.frontend_fn = process_frontend_fn(
 				dep.js,
 				!!dep.backend_fn,
@@ -144,7 +184,7 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 
 		target_map.set(_target_map);
 
-		constructor_map = preload_all_components(components, root);
+		constructor_map = preload_visible_components(components, layout, root);
 
 		instance_map = components.reduce(
 			(acc, c) => {
@@ -176,7 +216,31 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		root: string;
 		dependencies: Dependency[];
 	}): void {
-		let _constructor_map = preload_all_components(components, root);
+		// Update current layout and root for dynamic visibility recalculation
+		current_layout = layout;
+		current_root = root;
+
+		components.forEach((c) => {
+			for (const prop in c.props) {
+				if (c.props[prop] === null) {
+					c.props[prop] = undefined;
+				}
+			}
+		});
+		let replacement_components: ComponentMeta[] = [];
+		let new_components: ComponentMeta[] = [];
+		components.forEach((c) => {
+			if (c.key == null || !keys_per_render_id[render_id]?.includes(c.key)) {
+				new_components.push(c);
+			} else {
+				replacement_components.push(c);
+			}
+		});
+		let _constructor_map = preload_visible_components(
+			new_components,
+			layout,
+			root
+		);
 		_constructor_map.forEach((v, k) => {
 			constructor_map.set(k, v);
 		});
@@ -208,19 +272,40 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 			}
 		};
 		add_to_current_children(current_element);
-		store_keyed_values(all_current_children);
 
 		Object.entries(instance_map).forEach(([id, component]) => {
 			let _id = Number(id);
 			if (component.rendered_in === render_id) {
-				delete instance_map[_id];
-				if (_component_map.has(_id)) {
-					_component_map.delete(_id);
+				let replacement_component = replacement_components.find(
+					(c) => c.key === component.key
+				);
+				if (component.key != null && replacement_component !== undefined) {
+					const instance = instance_map[component.id];
+					for (const prop in replacement_component.props) {
+						if (
+							!(
+								replacement_component.props.preserved_by_key as
+									| string[]
+									| undefined
+							)?.includes(prop)
+						) {
+							instance.props[prop] = replacement_component.props[prop];
+						}
+					}
+				} else {
+					delete instance_map[_id];
+					if (_component_map.has(_id)) {
+						_component_map.delete(_id);
+					}
 				}
 			}
 		});
 
-		components.forEach((c) => {
+		const components_to_add = new_components.concat(
+			replacement_components.filter((c) => !instance_map[c.id])
+		);
+
+		components_to_add.forEach((c) => {
 			instance_map[c.id] = c;
 			_component_map.set(c.id, c);
 		});
@@ -237,6 +322,9 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 			current_element.parent
 		).then(() => {
 			layout_store.set(_rootNode);
+			keys_per_render_id[render_id] = components
+				.map((c) => c.key)
+				.filter((c) => c != null) as (string | number)[];
 		});
 
 		set_event_specific_args(dependencies);
@@ -249,10 +337,14 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		parent?: ComponentMeta
 	): Promise<ComponentMeta> {
 		const instance = instance_map[node.id];
+		if (!instance.component) {
+			const constructor_key = instance.component_class_id || instance.type;
+			let component_constructor = constructor_map.get(constructor_key);
 
-		instance.component = (await constructor_map.get(
-			instance.component_class_id || instance.type
-		))!?.default;
+			if (component_constructor) {
+				instance.component = (await component_constructor)?.default;
+			}
+		}
 		instance.parent = parent;
 
 		if (instance.type === "dataset") {
@@ -282,13 +374,6 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 			instance.props.server_fns,
 			app
 		);
-
-		if (
-			instance.key != null &&
-			keyed_component_values[instance.key] !== undefined
-		) {
-			instance.props.value = keyed_component_values[instance.key];
-		}
 
 		_component_map.set(instance.id, instance);
 
@@ -320,7 +405,8 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 			instance.props.initial_tabs = child_tab_items?.map((child) => ({
 				label: child.props.label,
 				id: child.props.id,
-				visible: child.props.visible,
+				visible:
+					typeof child.props.visible === "boolean" ? child.props.visible : true,
 				interactive: child.props.interactive,
 				order: child.props.order
 			}));
@@ -339,15 +425,86 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 	let update_scheduled = false;
 	let update_scheduled_store = writable(false);
 
-	function store_keyed_values(components: ComponentMeta[]): void {
-		components.forEach((c) => {
-			if (c.key != null) {
-				keyed_component_values[c.key] = c.props.value;
+	/**
+	 * Load newly visible components after visibility changes
+	 * @param newly_visible_ids Set of component IDs that are now visible
+	 */
+	async function load_newly_visible_components(
+		newly_visible_ids: Set<number>
+	): Promise<void> {
+		if (newly_visible_ids.size === 0) return;
+
+		const components_to_load = _components.filter((c) =>
+			newly_visible_ids.has(c.id)
+		);
+
+		for (const component of components_to_load) {
+			const constructor_key = component.component_class_id || component.type;
+
+			// Only load if not already loaded
+			if (!constructor_map.has(constructor_key)) {
+				const { component: loadable_component, example_components } =
+					get_component(
+						component.type,
+						component.component_class_id,
+						current_root,
+						_components
+					);
+
+				constructor_map.set(constructor_key, loadable_component);
+
+				if (example_components) {
+					for (const [name, example_component] of example_components) {
+						constructor_map.set(name, example_component);
+					}
+				}
+
+				// Load the component if it doesn't exist yet
+				if (!component.component) {
+					component.component = (await loadable_component)?.default;
+				}
+			} else {
+				component.component =
+					(await constructor_map.get(constructor_key))?.default ??
+					component.component;
 			}
-		});
+		}
+	}
+
+	/**
+	 * Check if any visibility-affecting properties have changed
+	 * @param updates Array of update transactions
+	 * @returns True if visibility might have changed
+	 */
+	function has_visibility_changes(updates: UpdateTransaction[][]): boolean {
+		return updates.some((update_batch) =>
+			update_batch.some((update) => {
+				const instance = instance_map[update.id];
+				if (!instance) return false;
+
+				// Check for visibility property changes
+				if (update.prop === "visible") return true;
+
+				// Check for selected tab changes in tabs components
+				if (update.prop === "selected" && instance.type === "tabs") return true;
+
+				return false;
+			})
+		);
 	}
 
 	function flush(): void {
+		const had_visibility_changes = has_visibility_changes(pending_updates);
+		let previous_visible_ids: Set<number> | undefined;
+
+		// Capture current visibility state before applying updates
+		if (had_visibility_changes && current_layout) {
+			previous_visible_ids = determine_visible_components(
+				current_layout,
+				_components
+			);
+		}
+
 		layout_store.update((layout) => {
 			for (let i = 0; i < pending_updates.length; i++) {
 				for (let j = 0; j < pending_updates[i].length; j++) {
@@ -356,6 +513,7 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 					const instance = instance_map[update.id];
 					if (!instance) continue;
 					let new_value;
+					const old_value = instance.props[update.prop];
 					if (update.value instanceof Map) new_value = new Map(update.value);
 					else if (update.value instanceof Set)
 						new_value = new Set(update.value);
@@ -365,10 +523,45 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 						new_value = { ...update.value };
 					else new_value = update.value;
 					instance.props[update.prop] = new_value;
+
+					if (
+						update.prop === "value" &&
+						!is_visible(instance) &&
+						!dequal(old_value, new_value)
+					) {
+						value_change_cb?.(update.id, new_value);
+					}
 				}
 			}
 			return layout;
 		});
+
+		// After applying updates, check if we need to load new components
+		if (had_visibility_changes && current_layout && previous_visible_ids) {
+			raf(async () => {
+				const new_visible_ids = determine_visible_components(
+					current_layout,
+					_components
+				);
+				const newly_visible_ids = new Set<number>();
+
+				// Find components that are now visible but weren't before
+				for (const id of new_visible_ids) {
+					if (!previous_visible_ids!.has(id)) {
+						newly_visible_ids.add(id);
+					}
+				}
+
+				// Load the newly visible components
+				await load_newly_visible_components(newly_visible_ids);
+
+				// Trigger a layout update to render the newly loaded components
+				if (newly_visible_ids.size > 0) {
+					layout_store.update((layout) => layout);
+				}
+			});
+		}
+
 		pending_updates = [];
 		update_scheduled = false;
 		update_scheduled_store.set(false);
@@ -454,7 +647,8 @@ export function create_components(initial_layout: ComponentMeta | undefined): {
 		loading_status,
 		scheduled_updates: update_scheduled_store,
 		create_layout: create_layout,
-		rerender_layout
+		rerender_layout,
+		value_change
 	};
 }
 
@@ -474,12 +668,12 @@ export const AsyncFunction: new (
  * @returns The function, or null if the source code is invalid or missing
  */
 export function process_frontend_fn(
-	source: string | null | undefined | false,
+	source: string | null | undefined | boolean,
 	backend_fn: boolean,
 	input_length: number,
 	output_length: number
 ): ((...args: unknown[]) => Promise<unknown[]>) | null {
-	if (!source) return null;
+	if (!source || source === true) return null;
 
 	const wrap = backend_fn ? input_length === 1 : output_length === 1;
 	try {
@@ -675,7 +869,219 @@ export function get_component(
 }
 
 /**
- * Preload all components
+ * Check if a tab item should be visible based on selection state
+ * @param component The tab item component
+ * @param component_visible Whether the component is visible
+ * @param parent_tabs_context Tab context from parent
+ * @returns Whether the tab item should be visible
+ */
+function is_tab_item_visible(
+	component: ComponentMeta,
+	component_visible: boolean,
+	parent_tabs_context?: { selected_tab_id?: string | number }
+): boolean {
+	const is_selected_tab =
+		parent_tabs_context?.selected_tab_id === component.id ||
+		parent_tabs_context?.selected_tab_id === component.props.id;
+	return component_visible && is_selected_tab;
+}
+
+/**
+ * Determine the selected tab ID for a tabs component
+ * @param component The tabs component
+ * @param layout The layout node
+ * @param components All components
+ * @returns The selected tab ID
+ */
+function get_selected_tab_id(
+	component: ComponentMeta,
+	layout: LayoutNode,
+	components: ComponentMeta[]
+): string | number | undefined {
+	// Check if selected prop is a string or number
+	const selected = component.props.selected;
+	if (typeof selected === "string" || typeof selected === "number") {
+		return selected;
+	}
+
+	// If no tab is explicitly selected, find the first visible and interactive tab
+	if (layout.children) {
+		for (const child of layout.children) {
+			const child_component = components.find((c) => c.id === child.id);
+			if (
+				child_component?.type === "tabitem" &&
+				child_component.props.visible !== false &&
+				child_component.props.interactive !== false
+			) {
+				return (
+					child_component.id || (child_component.props.id as string | number)
+				);
+			}
+		}
+	}
+
+	return undefined;
+}
+
+/**
+ * Process children components for visibility
+ * @param layout The layout node
+ * @param components All components
+ * @param parent_tabs_context Tab context
+ * @returns Set of visible child component IDs
+ */
+function process_children_visibility(
+	layout: LayoutNode,
+	components: ComponentMeta[],
+	parent_tabs_context?: { selected_tab_id?: string | number }
+): Set<number> {
+	const visible_components: Set<number> = new Set();
+
+	if (layout.children) {
+		for (const child of layout.children) {
+			const child_visible = determine_visible_components(
+				child,
+				components,
+				true,
+				parent_tabs_context
+			);
+			child_visible.forEach((id) => visible_components.add(id));
+		}
+	}
+
+	return visible_components;
+}
+
+/**
+ * Determine which components should be visible based on layout structure and visibility rules
+ * @param layout The layout tree
+ * @param components All component metadata
+ * @param parent_visible Whether the parent component is visible
+ * @param parent_tabs_context Information about parent tabs if any
+ * @returns Set of component IDs that should be visible
+ */
+function determine_visible_components(
+	layout: LayoutNode,
+	components: ComponentMeta[],
+	parent_visible = true,
+	parent_tabs_context?: { selected_tab_id?: string | number }
+): Set<number> {
+	const visible_components: Set<number> = new Set();
+	const component = components.find((c) => c.id === layout.id);
+
+	if (!component) {
+		return visible_components;
+	}
+
+	// Check if the component itself is visible
+	const component_visible =
+		parent_visible &&
+		(typeof component.props.visible === "boolean"
+			? component.props.visible
+			: true);
+
+	// Handle tab_item special case
+	if (component.type === "tabitem") {
+		if (
+			is_tab_item_visible(component, component_visible, parent_tabs_context)
+		) {
+			visible_components.add(component.id);
+
+			// Process children if this tab item is visible
+			const child_visible = process_children_visibility(
+				layout,
+				components,
+				parent_tabs_context
+			);
+			child_visible.forEach((id) => visible_components.add(id));
+		}
+		// If tab item is not visible, none of its children should be loaded
+		return visible_components;
+	}
+
+	// Handle tabs component
+	if (component.type === "tabs") {
+		if (component_visible) {
+			visible_components.add(component.id);
+
+			// Determine which tab should be selected
+			const selected_tab_id = get_selected_tab_id(
+				component,
+				layout,
+				components
+			);
+
+			// Process children with tabs context
+			const child_visible = process_children_visibility(layout, components, {
+				selected_tab_id
+			});
+			child_visible.forEach((id) => visible_components.add(id));
+		}
+		return visible_components;
+	}
+
+	// For regular components
+	if (component_visible) {
+		visible_components.add(component.id);
+
+		// Process children if this component is visible
+		const child_visible = process_children_visibility(
+			layout,
+			components,
+			parent_tabs_context
+		);
+		child_visible.forEach((id) => visible_components.add(id));
+	}
+	// If component is not visible, don't process children
+
+	return visible_components;
+}
+
+/**
+ * Preload only visible components
+ * @param components A list of component metadata
+ * @param layout The layout tree to determine visibility
+ * @param root The root url of the app
+ * @returns A map of component ids to their constructors
+ */
+export function preload_visible_components(
+	components: ComponentMeta[],
+	layout: LayoutNode,
+	root: string
+): Map<ComponentMeta["type"], LoadingComponent> {
+	let constructor_map: Map<ComponentMeta["type"], LoadingComponent> = new Map();
+
+	// Determine which components should be visible
+	const visible_component_ids = determine_visible_components(
+		layout,
+		components
+	);
+
+	// Only preload visible components
+	components.forEach((c) => {
+		if (visible_component_ids.has(c.id)) {
+			const { component, example_components } = get_component(
+				c.type,
+				c.component_class_id,
+				root,
+				components
+			);
+
+			constructor_map.set(c.component_class_id || c.type, component);
+
+			if (example_components) {
+				for (const [name, example_component] of example_components) {
+					constructor_map.set(name, example_component);
+				}
+			}
+		}
+	});
+
+	return constructor_map;
+}
+
+/**
+ * Preload all components (legacy function, kept for backwards compatibility)
  * @param components A list of component metadata
  * @param root The root url of the app
  * @returns A map of component ids to their constructors
@@ -704,4 +1110,16 @@ export function preload_all_components(
 	});
 
 	return constructor_map;
+}
+
+function is_visible(component: ComponentMeta): boolean {
+	if (
+		typeof component.props.visible === "boolean" &&
+		component.props.visible === false
+	) {
+		return false;
+	} else if (component.parent) {
+		return is_visible(component.parent);
+	}
+	return true;
 }

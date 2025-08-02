@@ -80,38 +80,53 @@ export async function resolve_config(
 		location.origin !== "http://localhost:9876" &&
 		!window.gradio_config.dev_mode
 	) {
-		const path = window.gradio_config.root;
-		const config = window.gradio_config;
-		let config_root = resolve_root(endpoint, config.root, false);
-		config.root = config_root;
-		return { ...config, path } as Config;
+		if (window.gradio_config.current_page) {
+			endpoint = endpoint.substring(0, endpoint.lastIndexOf("/"));
+		}
+		window.gradio_config.root = endpoint;
+		// @ts-ignore
+		return { ...window.gradio_config } as Config;
 	} else if (endpoint) {
-		const config_url = join_urls(endpoint, CONFIG_URL);
+		let config_url = join_urls(
+			endpoint,
+			this.deep_link ? CONFIG_URL + "?deep_link=" + this.deep_link : CONFIG_URL
+		);
 
 		const response = await this.fetch(config_url, {
 			headers,
 			credentials: "include"
 		});
 
-		if (response?.status === 401 && !this.options.auth) {
-			throw new Error(MISSING_CREDENTIALS_MSG);
-		} else if (response?.status === 401 && this.options.auth) {
-			throw new Error(INVALID_CREDENTIALS_MSG);
-		}
-		if (response?.status === 200) {
-			let config = await response.json();
-			config.path = config.path ?? "";
-			config.root = endpoint;
-			config.dependencies?.forEach((dep: any, i: number) => {
-				if (dep.id === undefined) {
-					dep.id = i;
-				}
-			});
-			return config;
-		} else if (response?.status === 401) {
-			throw new Error(UNAUTHORIZED_MSG);
-		}
-		throw new Error(CONFIG_ERROR_MSG);
+		return handleConfigResponse(response, endpoint, !!this.options.auth);
+	}
+
+	throw new Error(CONFIG_ERROR_MSG);
+}
+
+async function handleConfigResponse(
+	response: Response,
+	endpoint: string,
+	authorized: boolean
+): Promise<Config> {
+	if (response?.status === 401 && !authorized) {
+		const error_data = await response.json();
+		const auth_message = error_data?.detail?.auth_message;
+		throw new Error(auth_message || MISSING_CREDENTIALS_MSG);
+	} else if (response?.status === 401 && authorized) {
+		throw new Error(INVALID_CREDENTIALS_MSG);
+	}
+
+	if (response?.status === 200) {
+		let config = await response.json();
+		config.root = endpoint;
+		config.dependencies?.forEach((dep: any, i: number) => {
+			if (dep.id === undefined) {
+				dep.id = i;
+			}
+		});
+		return config;
+	} else if (response?.status === 401) {
+		throw new Error(UNAUTHORIZED_MSG);
 	}
 
 	throw new Error(CONFIG_ERROR_MSG);

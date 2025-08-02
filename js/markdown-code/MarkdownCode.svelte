@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { afterUpdate, tick } from "svelte";
-	import render_math_in_element from "katex/contrib/auto-render";
-	import "katex/dist/katex.min.css";
+	import { afterUpdate, tick, onMount } from "svelte";
 	import { create_marked } from "./utils";
 	import { sanitize } from "@gradio/sanitize";
 	import "./prism.css";
+	import { standardHtmlAndSvgTags } from "./html-tags";
+	import type { ThemeMode } from "@gradio/core";
 
 	export let chatbot = true;
 	export let message: string;
@@ -17,10 +17,11 @@
 	export let render_markdown = true;
 	export let line_breaks = true;
 	export let header_links = false;
-	export let root: string;
-
+	export let allow_tags: string[] | boolean = false;
+	export let theme_mode: ThemeMode = "system";
 	let el: HTMLSpanElement;
 	let html: string;
+	let katex_loaded = false;
 
 	const marked = create_marked({
 		header_links,
@@ -28,13 +29,59 @@
 		latex_delimiters: latex_delimiters || []
 	});
 
+	function has_math_syntax(text: string): boolean {
+		if (!latex_delimiters || latex_delimiters.length === 0) {
+			return false;
+		}
+
+		return latex_delimiters.some(
+			(delimiter) =>
+				text.includes(delimiter.left) && text.includes(delimiter.right)
+		);
+	}
+
 	function escapeRegExp(string: string): string {
 		return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	}
 
+	function escapeTags(
+		content: string,
+		tagsToEscape: string[] | boolean
+	): string {
+		if (tagsToEscape === true) {
+			// https://www.w3schools.com/tags/
+			const tagRegex = /<\/?([a-zA-Z][a-zA-Z0-9-]*)([\s>])/g;
+			return content.replace(tagRegex, (match, tagName, endChar) => {
+				if (!standardHtmlAndSvgTags.includes(tagName.toLowerCase())) {
+					return match.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+				}
+				return match;
+			});
+		}
+
+		if (Array.isArray(tagsToEscape)) {
+			const tagPattern = tagsToEscape.map((tag) => ({
+				open: new RegExp(`<(${tag})(\\s+[^>]*)?>`, "gi"),
+				close: new RegExp(`</(${tag})>`, "gi")
+			}));
+
+			let result = content;
+
+			tagPattern.forEach((pattern) => {
+				result = result.replace(pattern.open, (match) =>
+					match.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+				);
+				result = result.replace(pattern.close, (match) =>
+					match.replace(/</g, "&lt;").replace(/>/g, "&gt;")
+				);
+			});
+			return result;
+		}
+		return content;
+	}
+
 	function process_message(value: string): string {
 		let parsedValue = value;
-
 		if (render_markdown) {
 			const latexBlocks: string[] = [];
 			latex_delimiters.forEach((delimiter, index) => {
@@ -58,10 +105,13 @@
 			);
 		}
 
-		if (sanitize_html && sanitize) {
-			parsedValue = sanitize(parsedValue, root);
+		if (allow_tags) {
+			parsedValue = escapeTags(parsedValue, allow_tags);
 		}
 
+		if (sanitize_html && sanitize) {
+			parsedValue = sanitize(parsedValue);
+		}
 		return parsedValue;
 	}
 
@@ -72,15 +122,42 @@
 	}
 
 	async function render_html(value: string): Promise<void> {
-		if (latex_delimiters.length > 0 && value) {
-			const containsDelimiter = latex_delimiters.every(
-				(delimiter) =>
-					value.includes(delimiter.left) && value.includes(delimiter.right)
-			);
-			if (containsDelimiter) {
+		if (latex_delimiters.length > 0 && value && has_math_syntax(value)) {
+			if (!katex_loaded) {
+				await Promise.all([
+					import("katex/dist/katex.min.css"),
+					import("katex/contrib/auto-render")
+				]).then(([, { default: render_math_in_element }]) => {
+					katex_loaded = true;
+					render_math_in_element(el, {
+						delimiters: latex_delimiters,
+						throwOnError: false
+					});
+				});
+			} else {
+				const { default: render_math_in_element } = await import(
+					"katex/contrib/auto-render"
+				);
 				render_math_in_element(el, {
 					delimiters: latex_delimiters,
 					throwOnError: false
+				});
+			}
+		}
+
+		if (el) {
+			const mermaidDivs = el.querySelectorAll(".mermaid");
+			if (mermaidDivs.length > 0) {
+				await tick();
+				const { default: mermaid } = await import("mermaid");
+
+				mermaid.initialize({
+					startOnLoad: false,
+					theme: theme_mode === "dark" ? "dark" : "default",
+					securityLevel: "antiscript"
+				});
+				await mermaid.run({
+					nodes: Array.from(mermaidDivs).map((node) => node as HTMLElement)
 				});
 			}
 		}

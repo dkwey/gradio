@@ -71,7 +71,7 @@
 
 	let canvas3d: Canvas3D | undefined;
 	async function handle_undo(): Promise<void> {
-		canvas3d?.reset_camera_position(camera_position, zoom_speed, pan_speed);
+		canvas3d?.reset_camera_position();
 	}
 
 	const dispatch = createEventDispatcher<{
@@ -99,6 +99,7 @@
 		bind:dragging
 		bind:uploading
 		on:error
+		aria_label={i18n("model3d.drop_to_upload")}
 	>
 		<slot />
 	</Upload>

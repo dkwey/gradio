@@ -26,6 +26,7 @@ from gradio import image_utils, utils
 from gradio.components.base import Component, server
 from gradio.data_classes import FileData, GradioModel
 from gradio.events import Events
+from gradio.i18n import I18nData
 
 if TYPE_CHECKING:
     from gradio.components import Timer
@@ -94,12 +95,8 @@ class Brush(Eraser):
         color_mode: If set to "fixed", user can only select from among the colors in `colors`. If "defaults", the colors in `colors` are provided as a default palette, but the user can also select any color using a color picker.
     """
 
-    colors: Union[
-        list[str],
-        str,
-        None,
-    ] = None
-    default_color: Union[str, Literal["auto"]] = "auto"
+    colors: list[str | tuple[str, float]] | str | tuple[str, float] | None = None
+    default_color: str | tuple[str, float] | None = None
     color_mode: Literal["fixed", "defaults"] = "defaults"
 
     def __post_init__(self):
@@ -115,6 +112,39 @@ class Brush(Eraser):
             self.default_color = (
                 self.colors[0] if isinstance(self.colors, list) else self.colors
             )
+
+
+@document()
+@dataclasses.dataclass
+class LayerOptions:
+    """
+    A dataclass for specifying options for the layer tool in the ImageEditor component. An instance of this class can be passed to the `layers` parameter of `gr.ImageEditor`.
+    Parameters:
+        allow_additional_layers: If True, users can add additional layers to the image. If False, the add layer button will not be shown.
+        layers: A list of layers to make available to the user when using the layer tool. One layer must be provided, if the length of the list is 0 then a layer will be generated automatically.
+    """
+
+    allow_additional_layers: bool = True
+    layers: list[str] | None = None
+    disabled: bool = False
+
+    def __post_init__(self):
+        if self.layers is None or len(self.layers) == 0:
+            self.layers = ["Layer 1"]
+
+
+@document()
+@dataclasses.dataclass
+class WebcamOptions:
+    """
+    A dataclass for specifying options for the webcam tool in the ImageEditor component. An instance of this class can be passed to the `webcam_options` parameter of `gr.ImageEditor`.
+    Parameters:
+        mirror: If True, the webcam will be mirrored.
+        constraints: A dictionary of constraints for the webcam.
+    """
+
+    mirror: bool = True
+    constraints: dict[str, Any] | None = None
 
 
 @document()
@@ -146,15 +176,17 @@ class ImageEditor(Component):
         image_mode: Literal[
             "1", "L", "P", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"
         ] = "RGBA",
-        sources: Iterable[Literal["upload", "webcam", "clipboard"]]
-        | Literal["upload", "webcam", "clipboard"]
-        | None = (
+        sources: (
+            Iterable[Literal["upload", "webcam", "clipboard"]]
+            | Literal["upload", "webcam", "clipboard"]
+            | None
+        ) = (
             "upload",
             "webcam",
             "clipboard",
         ),
         type: Literal["numpy", "pil", "filepath"] = "numpy",
-        label: str | None = None,
+        label: str | I18nData | None = None,
         every: Timer | float | None = None,
         inputs: Component | Sequence[Component] | set[Component] | None = None,
         show_label: bool | None = None,
@@ -167,25 +199,28 @@ class ImageEditor(Component):
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
-        key: int | str | None = None,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = "value",
         placeholder: str | None = None,
-        mirror_webcam: bool = True,
+        mirror_webcam: bool | None = None,
         show_share_button: bool | None = None,
         _selectable: bool = False,
         crop_size: tuple[int | float, int | float] | str | None = None,
-        transforms: Iterable[Literal["crop"]] = ("crop",),
+        transforms: Iterable[Literal["crop", "resize"]] | None = ("crop", "resize"),
         eraser: Eraser | None | Literal[False] = None,
         brush: Brush | None | Literal[False] = None,
         format: str = "webp",
-        layers: bool = True,
-        canvas_size: tuple[int, int] | None = None,
+        layers: bool | LayerOptions = True,
+        canvas_size: tuple[int, int] = (800, 800),
+        fixed_canvas: bool = False,
         show_fullscreen_button: bool = True,
+        webcam_options: WebcamOptions | None = None,
     ):
         """
         Parameters:
             value: Optional initial image(s) to populate the image editor. Should be a dictionary with keys: `background`, `layers`, and `composite`. The values corresponding to `background` and `composite` should be images or None, while `layers` should be a list of images. Images can be of type PIL.Image, np.array, or str filepath/URL. Or, the value can be a callable, in which case the function will be called whenever the app loads to set the initial value of the component.
-            height: The height of the component, specified in pixels if a number is passed, or in CSS units if a string is passed. This has no effect on the preprocessed image files or numpy arrays, but will affect the displayed images.
-            width: The width of the component, specified in pixels if a number is passed, or in CSS units if a string is passed. This has no effect on the preprocessed image files or numpy arrays, but will affect the displayed images.
+            height: The height of the component, specified in pixels if a number is passed, or in CSS units if a string is passed. This has no effect on the preprocessed image files or numpy arrays, but will affect the displayed images. Beware of conflicting values with the canvas_size paramter. If the canvas_size is larger than the height, the editing canvas will not fit in the component.
+            width: The width of the component, specified in pixels if a number is passed, or in CSS units if a string is passed. This has no effect on the preprocessed image files or numpy arrays, but will affect the displayed images. Beware of conflicting values with the canvas_size paramter. If the canvas_size is larger than the height, the editing canvas will not fit in the component.
             image_mode: "RGB" if color, or "L" if black and white. See https://pillow.readthedocs.io/en/stable/handbook/concepts.html for other supported image modes and their meaning.
             sources: List of sources that can be used to set the background image. "upload" creates a box where user can drop an image file, "webcam" allows user to take snapshot from their webcam, "clipboard" allows users to paste an image from the clipboard.
             type: The format the images are converted to before being passed into the prediction function. "numpy" converts the images to numpy arrays with shape (height, width, 3) and values from 0 to 255, "pil" converts the images to PIL image objects, "filepath" passes images as str filepaths to temporary copies of the images.
@@ -202,21 +237,33 @@ class ImageEditor(Component):
             elem_id: An optional string that is assigned as the id of this component in the HTML DOM. Can be used for targeting CSS styles.
             elem_classes: An optional list of strings that are assigned as the classes of this component in the HTML DOM. Can be used for targeting CSS styles.
             render: If False, component will not render be rendered in the Blocks context. Should be used if the intention is to assign event listeners now but render the component later.
-            key: if assigned, will be used to assume identity across a re-render. Components that have the same key across a re-render will have their value preserved.
+            key: in a gr.render, Components with the same key across re-renders are treated as the same component, not a new component. Properties set in 'preserved_by_key' are not reset across a re-render.
+            preserved_by_key: A list of parameters from this component's constructor. Inside a gr.render() function, if a component is re-rendered with the same key, these (and only these) parameters will be preserved in the UI (if they have been changed by the user or an event listener) instead of re-rendered based on the values provided during constructor.
             placeholder: Custom text for the upload area. Overrides default upload messages when provided. Accepts new lines and `#` to designate a heading.
-            mirror_webcam: If True webcam will be mirrored. Default is True.
             show_share_button: If True, will show a share icon in the corner of the component that allows user to share outputs to Hugging Face Spaces Discussions. If False, icon does not appear. If set to None (default behavior), then the icon appears if this Gradio app is launched on Spaces, but not otherwise.
-            crop_size: The size of the crop box in pixels. If a tuple, the first value is the width and the second value is the height. If a string, the value must be a ratio in the form `width:height` (e.g. "16:9").
+            crop_size: Deprecated. Used to set the `canvas_size` parameter.
             transforms: The transforms tools to make available to users. "crop" allows the user to crop the image.
             eraser: The options for the eraser tool in the image editor. Should be an instance of the `gr.Eraser` class, or None to use the default settings. Can also be False to hide the eraser tool. [See `gr.Eraser` docs](#eraser).
             brush: The options for the brush tool in the image editor. Should be an instance of the `gr.Brush` class, or None to use the default settings. Can also be False to hide the brush tool, which will also hide the eraser tool. [See `gr.Brush` docs](#brush).
             format: Format to save image if it does not already have a valid format (e.g. if the image is being returned to the frontend as a numpy array or PIL Image).  The format should be supported by the PIL library. This parameter has no effect on SVG files.
-            layers: If True, will allow users to add layers to the image. If False, the layers option will be hidden.
-            canvas_size: The size of the default canvas in pixels. If a tuple, the first value is the width and the second value is the height. If None, the canvas size will be the same as the background image or 800 x 600 if no background image is provided.
+            layers: The options for the layer tool in the image editor. Can be a boolean     or an instance of the `gr.LayerOptions` class. If True, will allow users to add layers to the image. If False, the layers option will be hidden. If an instance of `gr.LayerOptions`, it will be used to configure the layer tool. [See `gr.LayerOptions` docs](#layer-options).
+            canvas_size: The initial size of the canvas in pixels. The first value is the width and the second value is the height. If `fixed_canvas` is `True`, uploaded images will be rescaled to fit the canvas size while preserving the aspect ratio. Otherwise, the canvas size will change to match the size of an uploaded image.
+            fixed_canvas: If True, the canvas size will not change based on the size of the background image and the image will be rescaled to fit (while preserving the aspect ratio) and placed in the center of the canvas.
             show_fullscreen_button: If True, will display button to view image in fullscreen mode.
+            webcam_options: The options for the webcam tool in the image editor. Can be an instance of the `gr.WebcamOptions` class, or None to use the default settings. [See `gr.WebcamOptions` docs](#webcam-options).
         """
         self._selectable = _selectable
-        self.mirror_webcam = mirror_webcam
+
+        self.webcam_options = (
+            webcam_options if webcam_options is not None else WebcamOptions()
+        )
+
+        if mirror_webcam is not None:
+            warnings.warn(
+                "The `mirror_webcam` parameter is deprecated. Please use the `webcam_options` parameter with a `gr.WebcamOptions` instance instead."
+            )
+            self.webcam_options.mirror = mirror_webcam
+
         valid_types = ["numpy", "pil", "filepath"]
         if type not in valid_types:
             raise ValueError(
@@ -247,17 +294,39 @@ class ImageEditor(Component):
             else show_share_button
         )
 
-        self.crop_size = crop_size
+        if crop_size is not None and canvas_size is None:
+            warnings.warn(
+                "`crop_size` parameter is deprecated. Please use `canvas_size` instead."
+            )
+            if isinstance(crop_size, str):
+                # convert ratio to tuple
+                proportion = [
+                    int(crop_size.split(":")[0]),
+                    int(crop_size.split(":")[1]),
+                ]
+                ratio = proportion[0] / proportion[1]
+                canvas_size = (
+                    (int(800 * ratio), 800) if ratio > 1 else (800, int(800 / ratio))
+                )
+            else:
+                canvas_size = (int(crop_size[0]), int(crop_size[1]))
+
         self.transforms = transforms
         self.eraser = Eraser() if eraser is None else eraser
         self.brush = Brush() if brush is None else brush
         self.blob_storage: dict[str, EditorDataBlobs] = {}
         self.format = format
-        self.layers = layers
+        self.layers = (
+            LayerOptions()
+            if layers is True
+            else LayerOptions(disabled=True)
+            if layers is False
+            else layers
+        )
         self.canvas_size = canvas_size
+        self.fixed_canvas = fixed_canvas
         self.show_fullscreen_button = show_fullscreen_button
         self.placeholder = placeholder
-
         super().__init__(
             label=label,
             every=every,
@@ -272,8 +341,10 @@ class ImageEditor(Component):
             elem_classes=elem_classes,
             render=render,
             key=key,
+            preserved_by_key=preserved_by_key,
             value=value,
         )
+        self._value_description = f"a dictionary with structure {{'background': image, 'layers': list of images, 'composite': image}} where each image is {'a filepath' if self.type == 'filepath' else 'a numpy array' if self.type == 'numpy' else 'a PIL Image object'}."
 
     def convert_and_format_image(
         self,
@@ -301,10 +372,6 @@ class ImageEditor(Component):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             im = im.convert(self.image_mode)
-        if self.crop_size and not isinstance(self.crop_size, str):
-            im = image_utils.crop_scale(
-                im, int(self.crop_size[0]), int(self.crop_size[1])
-            )
         return image_utils.format_image(
             im,
             cast(Literal["numpy", "pil", "filepath"], self.type),
@@ -320,9 +387,10 @@ class ImageEditor(Component):
         Returns:
             Passes the uploaded images as an instance of EditorValue, which is just a `dict` with keys: 'background', 'layers', and 'composite'. The values corresponding to 'background' and 'composite' are images, while 'layers' is a `list` of images. The images are of type `PIL.Image`, `np.array`, or `str` filepath, depending on the `type` parameter.
         """
-        _payload = payload
+        if payload is None:
+            return payload
 
-        if payload is not None and payload.id is not None:
+        if payload.id is not None:
             cached = self.blob_storage.get(payload.id)
             _payload = (
                 EditorDataBlobs(
@@ -333,9 +401,6 @@ class ImageEditor(Component):
                 if cached
                 else None
             )
-
-        elif _payload is None:
-            return _payload
         else:
             _payload = payload
 
@@ -352,7 +417,7 @@ class ImageEditor(Component):
             )
             composite = self.convert_and_format_image(_payload.composite)
 
-        if payload is not None and payload.id is not None:
+        if payload.id is not None and payload.id in self.blob_storage:
             self.blob_storage.pop(payload.id)
 
         return {

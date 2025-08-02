@@ -89,11 +89,13 @@
 	export let _retryable = false;
 	export let _undoable = false;
 	export let like_user_message = false;
-	export let root: string;
+	export let allow_tags: string[] | boolean = false;
+	export let watermark: string | null = null;
+	export let show_progress: "full" | "minimal" | "hidden" = "full";
 
 	let target: HTMLElement | null = null;
 	let edit_index: number | null = null;
-	let edit_message = "";
+	let edit_messages: string[] = [];
 
 	onMount(() => {
 		target = document.querySelector("div.gradio-container");
@@ -132,19 +134,19 @@
 
 	async function scroll_on_value_update(): Promise<void> {
 		if (!autoscroll) return;
-
 		if (is_at_bottom()) {
 			// Child components may be loaded asynchronously,
 			// so trigger the scroll again after they load.
 			scroll_after_component_load = true;
-
 			await tick(); // Wait for the DOM to update so that the scrollHeight is correct
+			await new Promise((resolve) => setTimeout(resolve, 300));
 			scroll_to_bottom();
-		} else {
-			show_scroll_button = true;
 		}
 	}
 	onMount(() => {
+		if (autoscroll) {
+			scroll_to_bottom();
+		}
 		scroll_on_value_update();
 	});
 	$: if (value || pending_message || _components) {
@@ -157,6 +159,7 @@
 				show_scroll_button = false;
 			} else {
 				scroll_after_component_load = false;
+				show_scroll_button = true;
 			}
 		}
 
@@ -172,7 +175,9 @@
 			dispatch("change");
 		}
 	}
-	$: groupedMessages = value && group_messages(value, msg_format);
+	$: groupedMessages =
+		value &&
+		group_messages(value, msg_format, display_consecutive_in_same_bubble);
 	$: options = value && get_last_bot_options();
 
 	function handle_action(
@@ -194,14 +199,14 @@
 			});
 		} else if (selected == "edit") {
 			edit_index = i;
-			edit_message = message.content as string;
+			edit_messages.push(message.content as string);
 		} else if (selected == "edit_cancel") {
 			edit_index = null;
 		} else if (selected == "edit_submit") {
 			edit_index = null;
 			dispatch("edit", {
 				index: message.index,
-				value: edit_message,
+				value: edit_messages[i].slice(),
 				previous_value: message.content as string
 			});
 		} else {
@@ -264,10 +269,13 @@
 				}}
 			/>
 		{/if}
-		<IconButton Icon={Trash} on:click={() => dispatch("clear")} label={"Clear"}
+		<IconButton
+			Icon={Trash}
+			on:click={() => dispatch("clear")}
+			label={i18n("chatbot.clear")}
 		></IconButton>
 		{#if show_copy_all_button}
-			<CopyAll {value} />
+			<CopyAll {value} {watermark} />
 		{/if}
 	</IconButtonWrapper>
 {/if}
@@ -305,7 +313,6 @@
 					{line_breaks}
 					{theme_mode}
 					{target}
-					{root}
 					{upload}
 					{selectable}
 					{sanitize_html}
@@ -319,6 +326,8 @@
 					{msg_format}
 					{feedback_options}
 					{current_feedback}
+					{allow_tags}
+					{watermark}
 					show_like={role === "user" ? likeable && like_user_message : likeable}
 					show_retry={_retryable && is_last_bot_message(messages, value)}
 					show_undo={_undoable && is_last_bot_message(messages, value)}
@@ -328,15 +337,29 @@
 							messages.length > 0 &&
 							messages[messages.length - 1].type == "text")}
 					in_edit_mode={edit_index === i}
-					bind:edit_message
+					bind:edit_messages
 					{show_copy_button}
-					handle_action={(selected) => handle_action(i, messages[0], selected)}
+					handle_action={(selected) => {
+						if (selected == "edit") {
+							edit_messages.splice(0, edit_messages.length);
+						}
+						if (selected === "edit" || selected === "edit_submit") {
+							messages.forEach((msg, index) => {
+								handle_action(selected === "edit" ? i : index, msg, selected);
+							});
+						} else {
+							handle_action(i, messages[0], selected);
+						}
+					}}
 					scroll={is_browser ? scroll : () => {}}
 					{allow_file_downloads}
 					on:copy={(e) => dispatch("copy", e.detail)}
 				/>
+				{#if show_progress !== "hidden" && generating && messages[messages.length - 1].role === "assistant" && messages[messages.length - 1].metadata?.status === "done"}
+					<Pending {layout} {avatar_images} />
+				{/if}
 			{/each}
-			{#if pending_message}
+			{#if show_progress !== "hidden" && pending_message}
 				<Pending {layout} {avatar_images} />
 			{:else if options}
 				<div class="options">
@@ -360,7 +383,6 @@
 			{examples}
 			{placeholder}
 			{latex_delimiters}
-			{root}
 			on:example_select={(e) => dispatch("example_select", e.detail)}
 		/>
 	{/if}

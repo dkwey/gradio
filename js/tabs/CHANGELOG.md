@@ -1,5 +1,35 @@
 # @gradio/tabs
 
+## 0.4.5
+
+### Fixes
+
+- [#11344](https://github.com/gradio-app/gradio/pull/11344) [`b961441`](https://github.com/gradio-app/gradio/commit/b961441780d70c82504141bd4deae7b3290c2227) - Fixes default tab label.  Thanks @dawoodkhan82!
+
+## 0.4.4
+
+### Fixes
+
+- [#11189](https://github.com/gradio-app/gradio/pull/11189) [`88f06c7`](https://github.com/gradio-app/gradio/commit/88f06c7b8126a67edefd3116c764148d0f39c6c7) - Ensure that tabs with `visible=False` don't show up in the overflow menu.  Thanks @abidlabs!
+
+## 0.4.3
+
+### Dependency updates
+
+- @gradio/utils@0.10.2
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/utils@0.10.1
+
+## 0.4.1
+
+### Fixes
+
+- [#10372](https://github.com/gradio-app/gradio/pull/10372) [`96bbde2`](https://github.com/gradio-app/gradio/commit/96bbde277e059f79bb2c9898576050e84dab147a) - Allow propogation of fill_height through Rows and Tabs, via scale.  Thanks @aliabid94!
+
 ## 0.4.0
 
 ### Features

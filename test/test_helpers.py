@@ -213,21 +213,13 @@ def test_example_caching_relaunch(connect):
         )
 
     with connect(demo) as client:
-        assert client.predict(1, api_name="/examples") == (
-            "hello",
-            "Eve",
-            "hello Eve",
-        )
+        assert client.predict(1, api_name="/examples") == "hello Eve"
 
     # Let the server shut down
     time.sleep(1)
 
     with connect(demo) as client:
-        assert client.predict(1, api_name="/examples") == (
-            "hello",
-            "Eve",
-            "hello Eve",
-        )
+        assert client.predict(1, api_name="/examples") == "hello Eve"
 
 
 @patch("gradio.utils.get_cache_folder", return_value=Path(tempfile.mkdtemp()))
@@ -264,18 +256,10 @@ class TestProcessExamples:
             )
 
         with connect(demo) as client:
-            assert client.predict(1, api_name="/examples") == (
-                "hello",
-                "Eve",
-                "hello Eve",
-            )
+            assert client.predict(1, api_name="/examples") == "hello Eve"
 
         with connect(demo) as client:
-            assert client.predict(1, api_name="/examples") == (
-                "hello",
-                "Eve",
-                "hello Eve",
-            )
+            assert client.predict(1, api_name="/examples") == "hello Eve"
 
     def test_caching_image(self, patched_cache_folder, connect):
         io = gr.Interface(
@@ -289,9 +273,14 @@ class TestProcessExamples:
             prediction = io.examples_handler.load_from_cache(0)
         assert prediction[0].path.endswith(".webp")
 
-    def test_caching_audio(self, patched_cache_folder, connect):
+    def test_caching_audio_with_progress(self, patched_cache_folder, connect):
+        def audio_identity(x, prog=gr.Progress()):
+            for _ in prog.tqdm(range(5)):
+                pass
+            return x
+
         io = gr.Interface(
-            lambda x: x,
+            audio_identity,
             "audio",
             "audio",
             examples=[["test/test_files/audio_sample.wav"]],
@@ -556,7 +545,6 @@ class TestProcessExamples:
         assert response.json()["data"] == [
             {
                 "lines": 1,
-                "max_lines": 20,
                 "show_label": True,
                 "container": True,
                 "min_width": 160,
@@ -567,6 +555,7 @@ class TestProcessExamples:
                 "show_copy_button": False,
                 "__type__": "update",
                 "visible": True,
+                "preserved_by_key": ["value"],
                 "value": "Hello,",
                 "type": "text",
                 "stop_btn": False,
@@ -578,7 +567,6 @@ class TestProcessExamples:
         assert response.json()["data"] == [
             {
                 "lines": 1,
-                "max_lines": 20,
                 "show_label": True,
                 "container": True,
                 "min_width": 160,
@@ -586,6 +574,7 @@ class TestProcessExamples:
                 "autoscroll": True,
                 "elem_classes": [],
                 "rtl": False,
+                "preserved_by_key": ["value"],
                 "show_copy_button": False,
                 "__type__": "update",
                 "visible": True,
@@ -618,10 +607,10 @@ class TestProcessExamples:
         client = TestClient(app)
 
         response = client.post(f"{API_PREFIX}/api/load_example/", json={"data": [0]})
-        assert response.json()["data"] == ["Hello,", "World", "Hello, World"]
+        assert response.json()["data"] == ["Hello, World"]
 
         response = client.post(f"{API_PREFIX}/api/load_example/", json={"data": [1]})
-        assert response.json()["data"] == ["Michael", "Jordan", "Michael Jordan"]
+        assert response.json()["data"] == ["Michael Jordan"]
 
     def test_end_to_end_lazy_cache_examples(self, patched_cache_folder):
         def image_identity(image, string):
@@ -650,13 +639,11 @@ class TestProcessExamples:
 
         response = client.post(f"{API_PREFIX}/api/load_example/", json={"data": [0]})
         data = response.json()["data"]
-        assert data[0]["path"].endswith("cheetah1.jpg")
-        assert data[1] == "cheetah"
+        assert data[0]["path"].endswith("image.webp")
 
         response = client.post(f"{API_PREFIX}/api/load_example/", json={"data": [1]})
         data = response.json()["data"]
-        assert data[0]["path"].endswith("bus.png")
-        assert data[1] == "bus"
+        assert data[0]["path"].endswith("image.webp")
 
 
 def test_multiple_file_flagging(tmp_path, connect):
@@ -742,14 +729,18 @@ class TestProgressBar:
                 status_updates.append(update)
             time.sleep(0.05)
 
-        assert status_updates == [
-            (None, "start"),
-            (0, None),
-            (1, None),
-            (2, None),
-            (3, None),
-            (4, None),
-        ]
+        assert all(
+            s
+            in [
+                (None, "start"),
+                (0, None),
+                (1, None),
+                (2, None),
+                (3, None),
+                (4, None),
+            ]
+            for s in status_updates
+        )
 
     @pytest.mark.asyncio
     async def test_progress_bar_track_tqdm(self):

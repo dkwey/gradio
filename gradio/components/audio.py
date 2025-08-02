@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import io
+import warnings
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -21,6 +22,7 @@ from gradio.components.base import Component, StreamingInput, StreamingOutput
 from gradio.data_classes import FileData, FileDataDict, MediaStreamChunk
 from gradio.events import Events
 from gradio.exceptions import Error
+from gradio.i18n import I18nData
 
 if TYPE_CHECKING:
     from gradio.components import Timer
@@ -35,10 +37,10 @@ class WaveformOptions:
         waveform_color: The color (as a hex string or valid CSS color) of the full waveform representing the amplitude of the audio. Defaults to a light gray color.
         waveform_progress_color: The color (as a hex string or valid CSS color) that the waveform fills with to as the audio plays. Defaults to the accent color.
         trim_region_color: The color (as a hex string or valid CSS color) of the trim region. Defaults to the accent color.
-        show_recording_waveform: Whether to show the waveform when recording audio. Defaults to True.
-        show_controls: Whether to show the standard HTML audio player below the waveform when recording audio or playing recorded audio. Defaults to False.
-        skip_length: The percentage (between 0 and 100) of the audio to skip when clicking on the skip forward / skip backward buttons. Defaults to 5.
-        sample_rate: The output sample rate (in Hz) of the audio after editing. Defaults to 44100.
+        show_recording_waveform: If True, shows a waveform when recording audio or playing audio. If False, uses the default browser audio players. For streamed audio, the default browser audio player is always used.
+        show_controls: Deprecated and has no effect. Use `show_recording_waveform` instead.
+        skip_length: The percentage (between 0 and 100) of the audio to skip when clicking on the skip forward / skip backward buttons.
+        sample_rate: The output sample rate (in Hz) of the audio after editing.
     """
 
     waveform_color: str | None = None
@@ -87,7 +89,7 @@ class Audio(
         | Literal["upload", "microphone"]
         | None = None,
         type: Literal["numpy", "filepath"] = "numpy",
-        label: str | None = None,
+        label: str | I18nData | None = None,
         every: Timer | float | None = None,
         inputs: Component | Sequence[Component] | set[Component] | None = None,
         show_label: bool | None = None,
@@ -100,7 +102,8 @@ class Audio(
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
-        key: int | str | None = None,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = "value",
         format: Literal["wav", "mp3"] | None = None,
         autoplay: bool = False,
         show_download_button: bool | None = None,
@@ -114,7 +117,7 @@ class Audio(
     ):
         """
         Parameters:
-            value: A path, URL, or [sample_rate, numpy array] tuple (sample rate in Hz, audio data as a float or int numpy array) for the default value that Audio component is going to take. If callable, the function will be called whenever the app loads to set the initial value of the component.
+            value: A path, URL, or [sample_rate, numpy array] tuple (sample rate in Hz, audio data as a float or int numpy array) for the default value that Audio component is going to take. If a function is provided, the function will be called each time the app loads to set the initial value of this component.
             sources: A list of sources permitted for audio. "upload" creates a box where user can drop an audio file, "microphone" creates a microphone input. The first element in the list will be used as the default source. If None, defaults to ["upload", "microphone"], or ["microphone"] if `streaming` is True.
             type: The format the audio file is converted to before being passed into the prediction function. "numpy" converts the audio to a tuple consisting of: (int sample rate, numpy.array for the data), "filepath" passes a str path to a temporary file containing the audio.
             label: the label for this component. Appears above the component and is also used as the header if there are a table of examples for this component. If None and used in a `gr.Interface`, the label will be the name of the parameter this component is assigned to.
@@ -130,7 +133,8 @@ class Audio(
             elem_id: An optional string that is assigned as the id of this component in the HTML DOM. Can be used for targeting CSS styles.
             elem_classes: An optional list of strings that are assigned as the classes of this component in the HTML DOM. Can be used for targeting CSS styles.
             render: if False, component will not render be rendered in the Blocks context. Should be used if the intention is to assign event listeners now but render the component later.
-            key: if assigned, will be used to assume identity across a re-render. Components that have the same key across a re-render will have their value preserved.
+            key: in a gr.render, Components with the same key across re-renders are treated as the same component, not a new component. Properties set in 'preserved_by_key' are not reset across a re-render.
+            preserved_by_key: A list of parameters from this component's constructor. Inside a gr.render() function, if a component is re-rendered with the same key, these (and only these) parameters will be preserved in the UI (if they have been changed by the user or an event listener) instead of re-rendered based on the values provided during constructor.
             format: the file extension with which to save audio files. Either 'wav' or 'mp3'. wav files are lossless but will tend to be larger files. mp3 files tend to be smaller. This parameter applies both when this component is used as an input (and `type` is "filepath") to determine which file format to convert user-provided audio to, and when this component is used as an output to determine the format of audio returned to the user. If None, no file format conversion is done and the audio is kept as is. In the case where output audio is returned from the prediction function as numpy array and no `format` is provided, it will be returned as a "wav" file.
             autoplay: Whether to automatically play the audio when the component is used as an output. Note: browsers will not autoplay audio files if the user has not interacted with the page yet.
             show_download_button: If True, will show a download button in the corner of the component for saving audio. If False, icon does not appear. By default, it will be True for output components and False for input components.
@@ -190,6 +194,10 @@ class Audio(
             self.waveform_options = WaveformOptions(**waveform_options)
         else:
             self.waveform_options = waveform_options
+        if self.waveform_options.show_controls is not False:
+            warnings.warn(
+                "The `show_controls` parameter is deprecated and will be removed in a future release. Use `show_recording_waveform` instead."
+            )
         self.min_length = min_length
         self.max_length = max_length
         self.recording = recording
@@ -207,7 +215,13 @@ class Audio(
             elem_classes=elem_classes,
             render=render,
             key=key,
+            preserved_by_key=preserved_by_key,
             value=value,
+        )
+        self._value_description = (
+            "a filepath to an audio file"
+            if self.type == "filepath"
+            else "a tuple of [sample_rate: int, data: np.ndarray] of audio data"
         )
 
     def example_payload(self) -> Any:
@@ -299,7 +313,10 @@ class Audio(
             )
             orig_name = Path(file_path).name
         elif isinstance(value, (str, Path)):
-            original_suffix = Path(value).suffix.lower()
+            if client_utils.is_http_url_like(value):
+                original_suffix = Path(httpx.URL(str(value)).path).suffix.lower()
+            else:
+                original_suffix = Path(value).suffix.lower()
             if self.format is not None and original_suffix != f".{self.format}":
                 sample_rate, data = processing_utils.audio_from_file(str(value))
                 file_path = processing_utils.save_audio_to_cache(

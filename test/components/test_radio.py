@@ -41,8 +41,10 @@ class TestRadio:
             "proxy_url": None,
             "_selectable": False,
             "key": None,
+            "preserved_by_key": ["value"],
             "type": "value",
             "info": None,
+            "rtl": False,
         }
 
         radio = gr.Radio(choices=["a", "b"], type="index")

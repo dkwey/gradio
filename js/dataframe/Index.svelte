@@ -1,26 +1,27 @@
+<svelte:options accessors={true} />
+
 <script context="module" lang="ts">
 	export { default as BaseDataFrame } from "./shared/Table.svelte";
 	export { default as BaseExample } from "./Example.svelte";
 </script>
 
 <script lang="ts">
-	import { afterUpdate, tick } from "svelte";
 	import type { Gradio, SelectData } from "@gradio/utils";
 	import { Block } from "@gradio/atoms";
 	import Table from "./shared/Table.svelte";
 	import { StatusTracker } from "@gradio/statustracker";
 	import type { LoadingStatus } from "@gradio/statustracker";
-	import type { Headers, Data, Metadata, Datatype } from "./shared/utils";
-	export let headers: Headers = [];
+	import type { Headers, Datatype, DataframeValue } from "./shared/utils";
+	import Image from "@gradio/image";
+
 	export let elem_id = "";
 	export let elem_classes: string[] = [];
 	export let visible = true;
-	export let value: { data: Data; headers: Headers; metadata: Metadata } = {
+	export let value: DataframeValue = {
 		data: [["", "", ""]],
 		headers: ["1", "2", "3"],
 		metadata: null
 	};
-	let old_value = "";
 	export let value_is_output = false;
 	export let col_count: [number, "fixed" | "dynamic"];
 	export let row_count: [number, "fixed" | "dynamic"];
@@ -39,6 +40,7 @@
 		select: SelectData;
 		input: never;
 		clear_status: LoadingStatus;
+		search: string | null;
 	}>;
 	export let latex_delimiters: {
 		left: string;
@@ -46,75 +48,16 @@
 		display: boolean;
 	}[];
 	export let max_height: number | undefined = undefined;
-
 	export let loading_status: LoadingStatus;
 	export let interactive: boolean;
-
-	let _headers: Headers;
-	let display_value: string[][] | null;
-	let styling: string[][] | null;
-	let values: (string | number)[][];
-	async function handle_change(data?: {
-		data: Data;
-		headers: Headers;
-		metadata: Metadata;
-	}): Promise<void> {
-		let _data = data || value;
-
-		_headers = [...(_data.headers || headers)];
-		values = _data.data ? [..._data.data] : [];
-		display_value = _data?.metadata?.display_value
-			? [..._data?.metadata?.display_value]
-			: null;
-		styling =
-			!interactive && _data?.metadata?.styling
-				? [..._data?.metadata?.styling]
-				: null;
-		await tick();
-
-		gradio.dispatch("change");
-		if (!value_is_output) {
-			gradio.dispatch("input");
-		}
-	}
-
-	handle_change();
-
-	afterUpdate(() => {
-		value_is_output = false;
-	});
-
-	$: {
-		if (old_value && JSON.stringify(value) !== old_value) {
-			old_value = JSON.stringify(value);
-			handle_change();
-		}
-	}
-
-	if (
-		(Array.isArray(value) && value?.[0]?.length === 0) ||
-		value.data?.[0]?.length === 0
-	) {
-		value = {
-			data: [Array(col_count?.[0] || 3).fill("")],
-			headers: Array(col_count?.[0] || 3)
-				.fill("")
-				.map((_, i) => `${i + 1}`),
-			metadata: null
-		};
-	}
-
-	async function handle_value_change(data: {
-		data: Data;
-		headers: Headers;
-		metadata: Metadata;
-	}): Promise<void> {
-		if (JSON.stringify(data) !== old_value) {
-			value = { ...data };
-			old_value = JSON.stringify(value);
-			handle_change(data);
-		}
-	}
+	export let show_fullscreen_button = false;
+	export let max_chars: number | undefined = undefined;
+	export let show_copy_button = false;
+	export let show_row_numbers = false;
+	export let show_search: "none" | "search" | "filter" = "none";
+	export let pinned_columns = 0;
+	export let static_columns: (string | number)[] = [];
+	export let fullscreen = false;
 </script>
 
 <Block
@@ -125,7 +68,8 @@
 	container={false}
 	{scale}
 	{min_width}
-	allow_overflow={false}
+	overflow_behavior="visible"
+	bind:fullscreen
 >
 	<StatusTracker
 		autoscroll={gradio.autoscroll}
@@ -139,12 +83,21 @@
 		{show_label}
 		{row_count}
 		{col_count}
-		{values}
-		{display_value}
-		{styling}
-		headers={_headers}
-		on:change={(e) => handle_value_change(e.detail)}
+		values={value.data}
+		display_value={value.metadata?.display_value}
+		styling={value.metadata?.styling}
+		headers={value.headers}
+		{fullscreen}
+		on:change={(e) => {
+			value.data = e.detail.data;
+			value.headers = e.detail.headers;
+			gradio.dispatch("change");
+		}}
+		on:input={(e) => gradio.dispatch("input")}
 		on:select={(e) => gradio.dispatch("select", e.detail)}
+		on:fullscreen={({ detail }) => {
+			fullscreen = detail;
+		}}
 		{wrap}
 		{datatype}
 		{latex_delimiters}
@@ -155,5 +108,14 @@
 		{column_widths}
 		upload={(...args) => gradio.client.upload(...args)}
 		stream_handler={(...args) => gradio.client.stream(...args)}
+		bind:value_is_output
+		{show_fullscreen_button}
+		{max_chars}
+		{show_copy_button}
+		{show_row_numbers}
+		{show_search}
+		{pinned_columns}
+		components={{ image: Image }}
+		{static_columns}
 	/>
 </Block>

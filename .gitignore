@@ -58,6 +58,7 @@ demo/unload_event_test/output_log.txt
 demo/stream_video_out/output_*.ts
 demo/stream_video_out/output_*.mp4
 demo/stream_audio_out/*.mp3
+#demo/image_editor_story/*.png
 
 # Etc
 .idea/*
@@ -96,3 +97,11 @@ js/storybook/theme.css
 
 # playwright
 .config/playwright/.cache
+
+*.local.*
+.claude/
+CLAUDE.md
+.sonda/
+
+# docs upload
+scripts/docs.json

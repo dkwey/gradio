@@ -1,5 +1,8 @@
 <script lang="ts">
 	export let parameters = [] as any[];
+	export let header = "Parameters";
+	export let anchor_links: string | boolean = true;
+
 	import ParamViewer from "@gradio/paramviewer";
 
 	interface OriginalParam {
@@ -61,4 +64,10 @@
 	let new_parameters = convert_params(parameters);
 </script>
 
-<ParamViewer value={new_parameters} header="Parameters" />
+<ParamViewer
+	value={new_parameters}
+	{header}
+	anchor_links={typeof anchor_links === "string"
+		? anchor_links.toLowerCase()
+		: anchor_links}
+/>

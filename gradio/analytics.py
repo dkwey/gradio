@@ -177,8 +177,7 @@ def launched_analytics(blocks: gradio.Blocks, data: dict[str, Any]) -> None:
 
     additional_data = {
         "version": get_package_version(),
-        "is_kaggle": blocks.is_kaggle,
-        "is_sagemaker": blocks.is_sagemaker,
+        "is_hosted_notebook": blocks.is_hosted_notebook,
         "using_auth": blocks.auth is not None,
         "dev_mode": blocks.dev_mode,
         "inputs": get_inputs_outputs(
@@ -237,6 +236,19 @@ def custom_component_analytics(
 
     _do_analytics_request(
         topic="gradio/custom-components",
+        data=data,
+    )
+
+
+def sketch_analytics() -> None:
+    data = {
+        "command": "sketch",
+    }
+    if not analytics_enabled():
+        return
+
+    _do_analytics_request(
+        topic="gradio/sketch",
         data=data,
     )
 

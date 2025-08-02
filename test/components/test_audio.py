@@ -71,6 +71,7 @@ class TestAudio:
             },
             "_selectable": False,
             "key": None,
+            "preserved_by_key": ["value"],
             "loop": False,
         }
         assert audio_input.preprocess(None) is None
@@ -129,6 +130,7 @@ class TestAudio:
             },
             "_selectable": False,
             "key": None,
+            "preserved_by_key": ["value"],
             "loop": False,
         }
 
@@ -182,6 +184,13 @@ class TestAudio:
             (48000, np.random.randint(-256, 256, (5, 3)).astype(np.int16))
         ).model_dump()  # type: ignore
         assert output["path"].endswith("mp3")
+
+    def test_postprocess_http_url_like(self):
+        audio = gr.Audio()
+        output = audio.postprocess("https://test.com/test.mp3?token=123")
+        assert isinstance(output, FileData) and output.path.endswith(
+            "test.mp3?token=123"
+        )
 
     @pytest.mark.asyncio
     async def test_combine_stream_audio(self, gradio_temp_dir):

@@ -10,6 +10,7 @@ from gradio_client.documentation import document
 
 from gradio.components.base import Component
 from gradio.components.plot import AltairPlot, AltairPlotData, Plot
+from gradio.i18n import I18nData
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -88,7 +89,7 @@ class ScatterPlot(Plot):
         y_lim: list[int | float] | None = None,
         caption: str | None = None,
         interactive: bool | None = True,
-        label: str | None = None,
+        label: str | I18nData | None = None,
         every: Timer | float | None = None,
         inputs: Component | Sequence[Component] | set[Component] | None = None,
         show_label: bool | None = None,
@@ -99,12 +100,13 @@ class ScatterPlot(Plot):
         elem_id: str | None = None,
         elem_classes: list[str] | str | None = None,
         render: bool = True,
-        key: int | str | None = None,
+        key: int | str | tuple[int | str, ...] | None = None,
+        preserved_by_key: list[str] | str | None = "value",
         show_actions_button: bool = False,
     ):
         """
         Parameters:
-            value: The pandas dataframe containing the data to display in a scatter plot, or a callable. If callable, the function will be called whenever the app loads to set the initial value of the component.
+            value: The pandas dataframe containing the data to display in a scatter plot, or a callable. If a function is provided, the function will be called each time the app loads to set the initial value of this component.
             x: Column corresponding to the x axis.
             y: Column corresponding to the y axis.
             color: The column to determine the point color. If the column contains numeric data, gradio will interpolate the column data so that small values correspond to light colors and large values correspond to dark values.
@@ -136,7 +138,8 @@ class ScatterPlot(Plot):
             elem_id: An optional string that is assigned as the id of this component in the HTML DOM. Can be used for targeting CSS styles.
             elem_classes: An optional list of strings that are assigned as the classes of this component in the HTML DOM. Can be used for targeting CSS styles.
             render: If False, component will not render be rendered in the Blocks context. Should be used if the intention is to assign event listeners now but render the component later.
-            key: if assigned, will be used to assume identity across a re-render. Components that have the same key across a re-render will have their value preserved.
+            key: in a gr.render, Components with the same key across re-renders are treated as the same component, not a new component. Properties set in 'preserved_by_key' are not reset across a re-render.
+            preserved_by_key: A list of parameters from this component's constructor. Inside a gr.render() function, if a component is re-rendered with the same key, these (and only these) parameters will be preserved in the UI (if they have been changed by the user or an event listener) instead of re-rendered based on the values provided during constructor.
             show_actions_button: Whether to show the actions button on the top right corner of the plot.
         """
         self.x = x
@@ -189,6 +192,7 @@ class ScatterPlot(Plot):
             elem_classes=elem_classes,
             render=render,
             key=key,
+            preserved_by_key=preserved_by_key,
         )
 
     def get_block_name(self) -> str:

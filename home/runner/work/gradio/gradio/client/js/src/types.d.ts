@@ -132,6 +132,7 @@ export interface Config {
     api_prefix?: string;
     fill_height?: boolean;
     fill_width?: boolean;
+    current_page: string;
 }
 export interface ComponentMeta {
     type: string;
@@ -195,6 +196,7 @@ export interface Dependency {
     show_api: boolean;
     zerogpu?: boolean;
     rendered_in: number | null;
+    render_id: number | null;
     connection: "stream" | "sse";
     time_limit: number;
     stream_every: number;

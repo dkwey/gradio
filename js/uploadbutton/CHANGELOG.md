@@ -1,5 +1,212 @@
 # @gradio/uploadbutton
 
+## 0.9.8
+
+### Dependency updates
+
+- @gradio/upload@0.16.12
+- @gradio/client@1.15.7
+- @gradio/button@0.5.8
+
+## 0.9.7
+
+### Dependency updates
+
+- @gradio/client@1.15.6
+- @gradio/button@0.5.7
+- @gradio/upload@0.16.11
+
+## 0.9.6
+
+### Dependency updates
+
+- @gradio/upload@0.16.10
+- @gradio/client@1.15.5
+- @gradio/button@0.5.6
+
+## 0.9.5
+
+### Dependency updates
+
+- @gradio/upload@0.16.9
+- @gradio/client@1.15.4
+- @gradio/button@0.5.5
+
+## 0.9.4
+
+### Dependency updates
+
+- @gradio/client@1.15.3
+- @gradio/upload@0.16.8
+- @gradio/button@0.5.4
+
+## 0.9.3
+
+### Dependency updates
+
+- @gradio/button@0.5.3
+
+## 0.9.3
+
+### Dependency updates
+
+- @gradio/upload@0.16.7
+- @gradio/client@1.15.2
+- @gradio/button@0.5.3
+
+## 0.9.2
+
+### Dependency updates
+
+- @gradio/button@0.5.2
+
+## 0.9.1
+
+### Dependency updates
+
+- @gradio/client@1.15.1
+- @gradio/button@0.5.1
+- @gradio/upload@0.16.6
+
+## 0.9.0
+
+### Features
+
+- [#11047](https://github.com/gradio-app/gradio/pull/11047) [`6d4b8a7`](https://github.com/gradio-app/gradio/commit/6d4b8a7f10daefc9c79aa224635da23fbaeebb76) - Implement custom i18n.  Thanks @hannahblair!
+
+### Dependency updates
+
+- @gradio/client@1.15.0
+- @gradio/upload@0.16.5
+- @gradio/button@0.5.0
+
+## 0.8.18
+
+### Dependency updates
+
+- @gradio/button@0.4.18
+- @gradio/upload@0.16.4
+
+## 0.8.17
+
+### Dependency updates
+
+- @gradio/button@0.4.17
+
+## 0.8.16
+
+### Dependency updates
+
+- @gradio/upload@0.16.3
+- @gradio/button@0.4.16
+
+## 0.8.15
+
+### Dependency updates
+
+- @gradio/client@1.14.2
+- @gradio/utils@0.10.2
+- @gradio/button@0.4.15
+- @gradio/upload@0.16.2
+
+## 0.8.14
+
+### Dependency updates
+
+- @gradio/button@0.4.14
+- @gradio/upload@0.16.1
+
+## 0.8.13
+
+### Dependency updates
+
+- @gradio/button@0.4.13
+- @gradio/upload@0.16.0
+
+## 0.8.12
+
+### Dependency updates
+
+- @gradio/client@1.14.1
+- @gradio/upload@0.15.7
+- @gradio/button@0.4.12
+
+## 0.8.11
+
+### Dependency updates
+
+- @gradio/client@1.14.0
+- @gradio/upload@0.15.6
+- @gradio/button@0.4.11
+
+## 0.8.10
+
+### Dependency updates
+
+- @gradio/upload@0.15.5
+- @gradio/button@0.4.10
+
+## 0.8.9
+
+### Dependency updates
+
+- @gradio/client@1.13.1
+- @gradio/upload@0.15.4
+- @gradio/button@0.4.9
+
+## 0.8.8
+
+### Dependency updates
+
+- @gradio/upload@0.15.3
+- @gradio/client@1.13.0
+- @gradio/button@0.4.8
+
+## 0.8.7
+
+### Dependency updates
+
+- @gradio/upload@0.15.2
+- @gradio/button@0.4.7
+
+## 0.8.6
+
+### Dependency updates
+
+- @gradio/utils@0.10.1
+- @gradio/client@1.12.0
+- @gradio/upload@0.15.1
+- @gradio/button@0.4.6
+
+## 0.8.5
+
+### Dependency updates
+
+- @gradio/client@1.11.0
+- @gradio/upload@0.15.0
+- @gradio/button@0.4.5
+
+## 0.8.4
+
+### Dependency updates
+
+- @gradio/upload@0.14.8
+- @gradio/button@0.4.4
+
+## 0.8.3
+
+### Dependency updates
+
+- @gradio/upload@0.14.7
+- @gradio/button@0.4.3
+
+## 0.8.2
+
+### Dependency updates
+
+- @gradio/upload@0.14.6
+- @gradio/button@0.4.2
+
 ## 0.8.1
 
 ### Dependency updates

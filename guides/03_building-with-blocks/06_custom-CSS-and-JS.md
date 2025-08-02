@@ -13,7 +13,7 @@ with gr.Blocks(theme=gr.themes.Glass()):
 
 Gradio comes with a set of prebuilt themes which you can load from `gr.themes.*`. You can extend these themes or create your own themes from scratch - see the [Theming guide](/guides/theming-guide) for more details.
 
-For additional styling ability, you can pass any CSS to your app using the `css=` kwarg. You can either the filepath to a CSS file, or a string of CSS code.
+For additional styling ability, you can pass any CSS to your app as a string using the `css=` kwarg. You can also pass a pathlib.Path to a css file or a list of such paths to the `css_paths=` kwarg.
 
 **Warning**: The use of query selectors in custom JS and CSS is _not_ guaranteed to work across Gradio versions that bind to Gradio's own HTML elements as the Gradio HTML DOM may change. We recommend using query selectors sparingly.
 
@@ -24,14 +24,14 @@ with gr.Blocks(css=".gradio-container {background-color: red}") as demo:
     ...
 ```
 
-If you'd like to reference external files in your css, preface the file path (which can be a relative or absolute path) with `"file="`, for example:
+If you'd like to reference external files in your css, preface the file path (which can be a relative or absolute path) with `"/gradio_api/file="`, for example:
 
 ```python
-with gr.Blocks(css=".gradio-container {background: url('file=clouds.jpg')}") as demo:
+with gr.Blocks(css=".gradio-container {background: url('/gradio_api/file=clouds.jpg')}") as demo:
     ...
 ```
 
-Note: By default, files in the host machine are not accessible to users running the Gradio app. As a result, you should make sure that any referenced files (such as `clouds.jpg` here) are either URLs or allowed via the `allow_list` parameter in `launch()`. Read more in our [section on Security and File Access](/main/guides/file-access).
+Note: By default, most files in the host machine are not accessible to users running the Gradio app. As a result, you should make sure that any referenced files (such as `clouds.jpg` here) are either URLs or [allowed paths, as described here](/main/guides/file-access).
 
 
 ## The `elem_id` and `elem_classes` Arguments
@@ -55,14 +55,13 @@ The CSS `#warning` ruleset will only target the second Textbox, while the `.feed
 
 There are 3 ways to add javascript code to your Gradio demo:
 
-1. You can add JavaScript code as a string or as a filepath to the `js` parameter of the `Blocks` or `Interface` initializer. This will run the JavaScript code when the demo is first loaded.
+1. You can add JavaScript code as a string to the `js` parameter of the `Blocks` or `Interface` initializer. This will run the JavaScript code when the demo is first loaded.
 
 Below is an example of adding custom js to show an animated welcome message when the demo first loads.
 
 $code_blocks_js_load
 $demo_blocks_js_load
 
-Note: You can also supply your custom js code as a file path. For example, if you have a file called `custom.js` in the same directory as your Python script, you can add it to your demo like so: `with gr.Blocks(js="custom.js") as demo:`. Same goes for `Interface` (ex: `gr.Interface(..., js="custom.js")`).
 
 2. When using `Blocks` and event listeners, events have a `js` argument that can take a JavaScript function as a string and treat it just like a Python event listener function. You can pass both a JavaScript function and a Python function (in which case the JavaScript function is run first) or only Javascript (and set the Python `fn` to `None`). Take a look at the code below:
    
@@ -84,13 +83,47 @@ head = f"""
 """
 
 with gr.Blocks(head=head) as demo:
-    ...demo code...
+    gr.HTML("<h1>My App</h1>")
+
+demo.launch()
 ```
 
-The `head` parameter accepts any HTML tags you would normally insert into the `<head>` of a page. For example, you can also include `<meta>` tags to `head`.
+The `head` parameter accepts any HTML tags you would normally insert into the `<head>` of a page. For example, you can also include `<meta>` tags to `head` in order to update the social sharing preview for your Gradio app like this:
 
-Note that injecting custom HTML can affect browser behavior and compatibility (e.g. keyboard shortcuts). You should test your interface across different browsers and be mindful of how scripts may interact with browser defaults.
-Here's an example where pressing `Shift + s` triggers the `click` event of a specific `Button` component if the browser focus is _not_ on an input component (e.g. `Textbox` component):
+```py
+import gradio as gr
+
+custom_head = """
+<!-- HTML Meta Tags -->
+<title>Sample App</title>
+<meta name="description" content="An open-source web application showcasing various features and capabilities.">
+
+<!-- Facebook Meta Tags -->
+<meta property="og:url" content="https://example.com">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sample App">
+<meta property="og:description" content="An open-source web application showcasing various features and capabilities.">
+<meta property="og:image" content="https://cdn.britannica.com/98/152298-050-8E45510A/Cheetah.jpg">
+
+<!-- Twitter Meta Tags -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:creator" content="@example_user">
+<meta name="twitter:title" content="Sample App">
+<meta name="twitter:description" content="An open-source web application showcasing various features and capabilities.">
+<meta name="twitter:image" content="https://cdn.britannica.com/98/152298-050-8E45510A/Cheetah.jpg">
+<meta property="twitter:domain" content="example.com">
+<meta property="twitter:url" content="https://example.com">  
+"""
+
+with gr.Blocks(title="My App", head=custom_head) as demo:
+    gr.HTML("<h1>My App</h1>")
+
+demo.launch()
+```
+
+
+
+Note that injecting custom JS can affect browser behavior and accessibility (e.g. keyboard shortcuts may be lead to unexpected behavior if your Gradio app is embedded in another webpage). You should test your interface across different browsers and be mindful of how scripts may interact with browser defaults. Here's an example where pressing `Shift + s` triggers the `click` event of a specific `Button` component if the browser focus is _not_ on an input component (e.g. `Textbox` component):
 
 ```python
 import gradio as gr
@@ -120,3 +153,4 @@ with gr.Blocks(head=shortcut_js) as demo:
     
 demo.launch()
 ```
+

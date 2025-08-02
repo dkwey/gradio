@@ -263,9 +263,33 @@ def save_audio_to_cache(
     return filename
 
 
+def detect_audio_format(data: bytes) -> str:
+    """Detect audio format from file header bytes.
+
+    Args:
+        data: File content as bytes
+
+    Returns:
+        Detected file extension with dot (e.g., ".wav", ".mp3") or empty string if not detected
+    """
+    # Check WAV format (RIFF header)
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return ".wav"
+    # Check MP3 format (ID3 tag)
+    elif len(data) >= 3 and data[:3] == b"ID3":  # noqa: SIM114
+        return ".mp3"
+    # Check MP3 format (sync frame)
+    elif len(data) >= 2 and data[:2] == b"\xff\xfb":
+        return ".mp3"
+    return ""
+
+
 def save_bytes_to_cache(data: bytes, file_name: str, cache_dir: str) -> str:
     path = Path(cache_dir) / hash_bytes(data)
     path.mkdir(exist_ok=True, parents=True)
+    if not Path(file_name).suffix:
+        detected_extension = detect_audio_format(data)
+        file_name = file_name + detected_extension
     path = path / Path(file_name).name
     path.write_bytes(data)
     return str(path.resolve())
@@ -291,7 +315,11 @@ def save_file_to_cache(file_path: str | Path, cache_dir: str) -> str:
 # to an internal IP address. This is because Hugging Face uses DNS splitting,
 # which means that requests from HF Spaces to HF Datasets or HF Models
 # may resolve to internal IP addresses even if they are publicly accessible.
-PUBLIC_HOSTNAME_WHITELIST = ["hf.co", "huggingface.co"]
+PUBLIC_HOSTNAME_WHITELIST = [
+    "hf.co",
+    "huggingface.co",
+    "cas-bridge-direct.xethub.hf.co",
+]
 
 
 def is_public_ip(ip: str) -> bool:
@@ -328,15 +356,18 @@ def lru_cache_async(maxsize: int = 128):
 async def async_ssrf_protected_download(url: str, cache_dir: str) -> str:
     temp_dir = Path(cache_dir) / hash_url(url)
     temp_dir.mkdir(exist_ok=True, parents=True)
-    filename = client_utils.strip_invalid_filename_characters(Path(url).name)
-    full_temp_file_path = str(abspath(temp_dir / filename))
 
+    parsed_url = urlparse(url)
+    base_path = parsed_url.path.rstrip("/")
+    filename = (
+        client_utils.strip_invalid_filename_characters(Path(base_path).name) or "file"
+    )
+
+    full_temp_file_path = str(abspath(temp_dir / filename))
     if Path(full_temp_file_path).exists():
         return full_temp_file_path
 
-    parsed_url = urlparse(url)
     hostname = parsed_url.hostname
-
     response = await sh.get(
         url, domain_whitelist=PUBLIC_HOSTNAME_WHITELIST, _transport=async_transport
     )
@@ -472,6 +503,14 @@ def move_files_to_cache(
         keep_in_cache: If True, the file will not be deleted from cache when the server is shut down.
     """
 
+    def _mark_svg_as_safe(payload: FileData):
+        # If the app has not launched, this path can be considered an "allowed path"
+        # This is mainly so that svg files can be displayed inline for button/chatbot icons
+        if (
+            (blocks := LocalContext.blocks.get()) is None or not blocks.is_running
+        ) and (mimetypes.guess_type(payload.path)[0] == "image/svg+xml"):
+            utils.set_static_paths([payload.path])
+
     def _move_to_cache(d: dict):
         payload = FileData(**d)
         # If the gradio app developer is returning a URL from
@@ -507,7 +546,7 @@ def move_files_to_cache(
         else:
             url = f"{url_prefix}{payload.path}"
         payload.url = url
-
+        _mark_svg_as_safe(payload)
         return payload.model_dump()
 
     if isinstance(data, (GradioRootModel, GradioModel)):
@@ -645,7 +684,7 @@ def add_root_url(data: dict | list, root_url: str, previous_root_url: str | None
             file_dict["url"] = file_dict["url"][len(previous_root_url) :]
         elif client_utils.is_http_url_like(file_dict["url"]):
             return file_dict
-        file_dict["url"] = f'{root_url}{file_dict["url"]}'
+        file_dict["url"] = f"{root_url}{file_dict['url']}"
         return file_dict
 
     return client_utils.traverse(data, _add_root_url, client_utils.is_file_obj_with_url)
@@ -1091,12 +1130,15 @@ def video_is_playable(video_filepath: str) -> bool:
             inputs={video_filepath: None},
         )
         output = probe.run(stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        output = json.loads(output[0])
+        output = json.loads(output[0])  # type: ignore
         video_codec = output["streams"][0]["codec_name"]
         return (container, video_codec) in [
             (".mp4", "h264"),
+            (".mp4", "av1"),
             (".ogg", "theora"),
             (".webm", "vp9"),
+            (".webm", "vp8"),
+            (".webm", "av1"),
         ]
     # If anything goes wrong, assume the video can be played to not convert downstream
     except (FFRuntimeError, IndexError, KeyError):

@@ -13,6 +13,9 @@ concurrency:
 
 permissions: {}
 
+env:
+  CI: true
+
 jobs:
   changes:
     permissions:
@@ -48,7 +51,7 @@ jobs:
         with:
           build_lite: true
           skip_build: true
-          python_version: "3.10"
+          python_version: "3.12.7" # Same as the Python version that the used Pyodide version is based on
           test: true
       - run: pnpm exec playwright install chromium firefox
       - name: build essential packages
@@ -56,7 +59,7 @@ jobs:
       - name: Run Lite E2E tests
         run: |
           . venv/bin/activate
-          pnpm --filter @gradio/lite test:browser
+          xvfb-run pnpm --filter @gradio/lite test:browser
       - name: Get the performance result
         run: |
           export LITE_APP_LOAD_TIME=$(jq -r '.app_load_time' .lite-perf.json)

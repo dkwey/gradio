@@ -3,6 +3,7 @@ import json
 import gradio._simple_templates
 import gradio.image_utils
 import gradio.processing_utils
+import gradio.sketch
 import gradio.templates
 from gradio import components, layouts, themes
 from gradio.blocks import Blocks
@@ -24,10 +25,12 @@ from gradio.components import (
     ClearButton,
     Code,
     ColorPicker,
+    Component,
     DataFrame,
     Dataframe,
     Dataset,
     DateTime,
+    DeepLinkButton,
     DownloadButton,
     Dropdown,
     DuplicateButton,
@@ -39,6 +42,8 @@ from gradio.components import (
     Highlightedtext,
     Image,
     ImageEditor,
+    ImageSlider,
+    InputHTMLAttributes,
     Json,
     Label,
     LinePlot,
@@ -62,7 +67,7 @@ from gradio.components import (
     component,
 )
 from gradio.components.audio import WaveformOptions
-from gradio.components.image_editor import Brush, Eraser
+from gradio.components.image_editor import Brush, Eraser, LayerOptions, WebcamOptions
 from gradio.data_classes import FileData
 from gradio.events import (
     CopyData,
@@ -79,7 +84,7 @@ from gradio.events import (
     on,
 )
 from gradio.exceptions import Error
-from gradio.external import load, load_chat
+from gradio.external import load, load_chat, load_openapi
 from gradio.flagging import (
     CSVLogger,
     FlaggingCallback,
@@ -87,10 +92,12 @@ from gradio.flagging import (
 )
 from gradio.helpers import Info, Progress, Success, Warning, skip, update
 from gradio.helpers import create_examples as Examples  # noqa: N812
+from gradio.i18n import I18n
 from gradio.interface import Interface, TabbedInterface, close_all
-from gradio.layouts import Accordion, Column, Group, Row, Tab, TabItem, Tabs
+from gradio.layouts import Accordion, Column, Group, Row, Sidebar, Tab, TabItem, Tabs
 from gradio.oauth import OAuthProfile, OAuthToken
 from gradio.renderable import render
+from gradio.route_utils import Header
 from gradio.routes import Request, mount_gradio_app
 from gradio.templates import (
     Files,
@@ -136,6 +143,7 @@ __all__ = [
     "Code",
     "ColorPicker",
     "Column",
+    "Component",
     "CopyData",
     "DataFrame",
     "Dataframe",
@@ -159,6 +167,7 @@ __all__ = [
     "FlaggingCallback",
     "Gallery",
     "Group",
+    "Header",
     "HTML",
     "Highlight",
     "HighlightedText",
@@ -166,13 +175,16 @@ __all__ = [
     "IS_WASM",
     "Image",
     "ImageEditor",
+    "ImageSlider",
     "ImageMask",
     "Info",
+    "InputHTMLAttributes",
     "Interface",
     "JSON",
     "Json",
     "KeyUpData",
     "Label",
+    "LayerOptions",
     "LikeData",
     "LinePlot",
     "List",
@@ -200,6 +212,7 @@ __all__ = [
     "Row",
     "ScatterPlot",
     "SelectData",
+    "Sidebar",
     "SimpleCSVLogger",
     "Sketchpad",
     "Slider",
@@ -219,17 +232,21 @@ __all__ = [
     "Video",
     "Warning",
     "WaveformOptions",
+    "WebcamOptions",
     "__version__",
     "close_all",
     "deploy",
     "get_package_version",
+    "I18n",
     "load",
     "load_chat",
     "load_ipython_extension",
+    "load_openapi",
     "mount_gradio_app",
     "on",
     "render",
     "set_static_paths",
     "skip",
     "update",
+    "DeepLinkButton",
 ]

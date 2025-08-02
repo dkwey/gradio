@@ -1,5 +1,273 @@
 # @gradio/lite
 
+## 5.39.0
+
+### Dependency updates
+
+- @gradio/core@0.24.0
+
+## 5.38.2
+
+### Dependency updates
+
+- @gradio/core@0.23.2
+
+## 5.38.1
+
+### Dependency updates
+
+- @gradio/core@0.23.1
+
+## 5.38.0
+
+### Dependency updates
+
+- @gradio/core@0.23.0
+
+## 5.37.0
+
+### Dependency updates
+
+- @gradio/core@0.22.0
+
+## 5.36.0
+
+### Features
+
+- [#11157](https://github.com/gradio-app/gradio/pull/11157) [`c207de9`](https://github.com/gradio-app/gradio/commit/c207de96f8ae2ce6c74026ff696c7fa4cf3a87c7) - Build the Gradio wheel for Lite before packaging.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+- @gradio/core@0.21.0
+
+## 5.35.0
+
+### Dependency updates
+
+- @gradio/core@0.20.0
+
+## 5.34.2
+
+### Dependency updates
+
+- @gradio/core@0.19.3
+
+## 5.34.1
+
+### Dependency updates
+
+- @gradio/atoms@0.16.2
+- @gradio/core@0.19.3
+
+## 5.33.2
+
+### Dependency updates
+
+- @gradio/core@0.19.2
+
+## 5.33.1
+
+### Dependency updates
+
+- @gradio/core@0.19.1
+
+## 5.33.0
+
+### Dependency updates
+
+- @gradio/core@0.19.0
+
+## 5.32.0
+
+### Dependency updates
+
+- @gradio/core@0.18.1
+
+## 5.31.0
+
+### Dependency updates
+
+- @gradio/core@0.18.0
+
+## 5.30.0
+
+### Dependency updates
+
+- @gradio/atoms@0.16.1
+- @gradio/core@0.17.0
+
+## 5.29.0
+
+### Dependency updates
+
+- @gradio/core@0.16.1
+
+## 5.28.0
+
+### Dependency updates
+
+- @gradio/core@0.16.0
+
+## 5.27.1
+
+### Dependency updates
+
+- @gradio/core@0.15.1
+
+## 5.27.0
+
+### Dependency updates
+
+- @gradio/atoms@0.16.0
+- @gradio/core@0.15.0
+
+## 5.26.0
+
+### Dependency updates
+
+- @gradio/core@0.14.1
+
+## 5.25.1
+
+### Dependency updates
+
+- @gradio/atoms@0.15.2
+- @gradio/core@0.14.0
+
+## 5.25.0
+
+### Dependency updates
+
+- @gradio/atoms@0.15.1
+- @gradio/core@0.14.0
+
+## 5.24.0
+
+### Dependency updates
+
+- @gradio/core@0.13.2
+- @gradio/atoms@0.15.0
+
+## 5.23.1
+
+### Dependency updates
+
+- @gradio/wasm@0.18.1
+- @gradio/core@0.13.2
+
+## 5.23.0
+
+### Dependency updates
+
+- @gradio/atoms@0.14.1
+- @gradio/core@0.13.1
+- @gradio/wasm@0.18.0
+
+## 5.21.0
+
+### Features
+
+- [#10733](https://github.com/gradio-app/gradio/pull/10733) [`731ab92`](https://github.com/gradio-app/gradio/commit/731ab92001c88d4cf1062acf0a4f1108a4513014) - Autocompletion on code editor component.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/atoms@0.14.0
+- @gradio/core@0.13.0
+
+## 5.20.1
+
+### Dependency updates
+
+- @gradio/wasm@0.17.4
+- @gradio/core@0.12.1
+
+## 5.20.0
+
+### Dependency updates
+
+- @gradio/core@0.12.0
+
+## 5.19.0
+
+### Dependency updates
+
+- @gradio/core@0.11.1
+
+## 5.17.0
+
+### Features
+
+- [#10569](https://github.com/gradio-app/gradio/pull/10569) [`bd4895a`](https://github.com/gradio-app/gradio/commit/bd4895a95a29fa1f0d12fefde26a82a1d60954e9) - Update Lite to support multi-page apps.  Thanks @whitphx!
+- [#10575](https://github.com/gradio-app/gradio/pull/10575) [`866780a`](https://github.com/gradio-app/gradio/commit/866780a7cbeed05b83c1c67eab19013bb6e2cafa) - Independent scrolling of the code editor in an embedded Lite app in the playground mode.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/core@0.11.0
+
+## 5.16.2
+
+### Dependency updates
+
+- @gradio/atoms@0.13.3
+
+## 5.16.1
+
+### Dependency updates
+
+- @gradio/core@0.10.1
+
+## 5.16.0
+
+### Fixes
+
+- [#10466](https://github.com/gradio-app/gradio/pull/10466) [`8e2cf2f`](https://github.com/gradio-app/gradio/commit/8e2cf2f32c4ffe4540aed0dd8448089f0a19eedd) - Fix the wrapper function of micropip.install to throw the original error for better debug experience.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/atoms@0.13.2
+- @gradio/theme@0.4.0
+- @gradio/core@0.10.0
+- @gradio/wasm@0.17.3
+- @self/build@0.2.1
+
+## 5.15.1
+
+### Features
+
+- [#10505](https://github.com/gradio-app/gradio/pull/10505) [`b172c19`](https://github.com/gradio-app/gradio/commit/b172c19a1877d2b47be6189289b6a58b79f6b31e) - Workaround for Lite to work with multipage client API.  Thanks @whitphx!
+
+## 5.15.0
+
+### Features
+
+- [#10433](https://github.com/gradio-app/gradio/pull/10433) [`2e8dc74`](https://github.com/gradio-app/gradio/commit/2e8dc74f751be02f7217f78d241806b42fcdca04) - Allow building multipage Gradio apps.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/core@0.9.0
+
+## 5.14.0
+
+### Dependency updates
+
+- @gradio/wasm@0.17.2
+- @gradio/core@0.8.0
+
+## 5.13.1
+
+### Dependency updates
+
+- @gradio/wasm@0.17.1
+- @gradio/core@0.7.0
+
+## 5.13.0
+
+### Dependency updates
+
+- @gradio/wasm@0.17.0
+- @gradio/core@0.7.0
+
 ## 5.12.0
 
 ### Dependency updates

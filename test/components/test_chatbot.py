@@ -48,7 +48,7 @@ class TestChatbot:
             "height": 400,
             "feedback_options": ("Like", "Dislike"),
             "feedback_value": None,
-            "resizeable": False,
+            "resizable": False,
             "max_height": None,
             "min_height": None,
             "autoscroll": True,
@@ -58,6 +58,7 @@ class TestChatbot:
             "_undoable": False,
             "allow_file_downloads": True,
             "key": None,
+            "preserved_by_key": ["value"],
             "type": "tuples",
             "latex_delimiters": [{"display": True, "left": "$$", "right": "$$"}],
             "likeable": False,
@@ -69,8 +70,10 @@ class TestChatbot:
             "bubble_full_width": None,
             "line_breaks": True,
             "layout": None,
+            "allow_tags": False,
             "show_copy_all_button": False,
             "examples": None,
+            "watermark": None,
         }
 
     def test_avatar_images_are_moved_to_cache(self):

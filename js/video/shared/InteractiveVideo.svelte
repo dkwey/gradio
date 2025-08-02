@@ -5,7 +5,7 @@
 	import { BlockLabel } from "@gradio/atoms";
 	import { Webcam } from "@gradio/image";
 	import { Video } from "@gradio/icons";
-
+	import type { WebcamOptions } from "./utils";
 	import { prettyBytes, playable } from "./utils";
 	import Player from "./Player.svelte";
 	import type { I18nFormatter } from "@gradio/utils";
@@ -21,7 +21,7 @@
 	export let label: string | undefined = undefined;
 	export let show_download_button = false;
 	export let show_label = true;
-	export let mirror_webcam = false;
+	export let webcam_options: WebcamOptions;
 	export let include_audio: boolean;
 	export let autoplay: boolean;
 	export let root: string;
@@ -33,7 +33,6 @@
 	export let stream_handler: Client["stream"];
 	export let loop: boolean;
 	export let uploading = false;
-	export let webcam_constraints: { [key: string]: any } | null = null;
 
 	let has_change_history = false;
 
@@ -92,15 +91,16 @@
 					{root}
 					{upload}
 					{stream_handler}
+					aria_label={i18n("video.drop_to_upload")}
 				>
 					<slot />
 				</Upload>
 			{:else if active_source === "webcam"}
 				<Webcam
 					{root}
-					{mirror_webcam}
+					mirror_webcam={webcam_options.mirror}
+					webcam_constraints={webcam_options.constraints}
 					{include_audio}
-					{webcam_constraints}
 					mode="video"
 					on:error
 					on:capture={handle_capture}
@@ -112,7 +112,7 @@
 				/>
 			{/if}
 		</div>
-	{:else if playable()}
+	{:else if value?.url}
 		{#key value?.url}
 			<Player
 				{upload}
@@ -126,7 +126,8 @@
 				on:pause
 				on:stop
 				on:end
-				mirror={mirror_webcam && active_source === "webcam"}
+				on:error
+				mirror={webcam_options.mirror && active_source === "webcam"}
 				{label}
 				{handle_change}
 				{handle_reset_value}

@@ -1,5 +1,75 @@
 # @gradio/form
 
+## 0.2.21
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+
+## 0.2.20
+
+### Dependency updates
+
+- @gradio/atoms@0.16.2
+
+## 0.2.19
+
+### Dependency updates
+
+- @gradio/atoms@0.16.1
+
+## 0.2.18
+
+### Dependency updates
+
+- @gradio/atoms@0.16.0
+
+## 0.2.17
+
+### Dependency updates
+
+- @gradio/atoms@0.15.2
+- @gradio/utils@0.10.2
+
+## 0.2.16
+
+### Dependency updates
+
+- @gradio/atoms@0.15.1
+- @gradio/icons@0.12.0
+
+## 0.2.15
+
+### Dependency updates
+
+- @gradio/atoms@0.15.0
+- @gradio/icons@0.11.0
+
+## 0.2.14
+
+### Dependency updates
+
+- @gradio/atoms@0.14.1
+
+## 0.2.13
+
+### Dependency updates
+
+- @gradio/atoms@0.14.0
+
+## 0.2.12
+
+### Dependency updates
+
+- @gradio/atoms@0.13.3
+
+## 0.2.11
+
+### Dependency updates
+
+- @gradio/atoms@0.13.2
+- @gradio/utils@0.10.1
+
 ## 0.2.10
 
 ### Dependency updates

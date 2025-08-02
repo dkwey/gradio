@@ -1,5 +1,221 @@
 # @gradio/code
 
+## 0.14.12
+
+### Dependency updates
+
+- @gradio/upload@0.16.12
+
+## 0.14.11
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.15
+- @gradio/upload@0.16.11
+
+## 0.14.10
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+- @gradio/statustracker@0.10.14
+- @gradio/upload@0.16.10
+
+## 0.14.9
+
+### Dependency updates
+
+- @gradio/upload@0.16.9
+
+## 0.14.8
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.13
+- @gradio/atoms@0.16.2
+- @gradio/upload@0.16.8
+
+## 0.14.7
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.14.7
+
+### Features
+
+- [#11380](https://github.com/gradio-app/gradio/pull/11380) [`0b2b6cb`](https://github.com/gradio-app/gradio/commit/0b2b6cbd44562a2f5843af872fe6761c5f255185) - Truncate textbox examples to 70 chars.  Thanks @hannahblair!
+
+## 0.14.6
+
+### Dependency updates
+
+- @gradio/upload@0.16.7
+
+## 0.14.5
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.14.5
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+- @gradio/upload@0.16.6
+
+## 0.14.4
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+- @gradio/atoms@0.16.1
+- @gradio/upload@0.16.5
+
+## 0.14.3
+
+### Dependency updates
+
+- @gradio/upload@0.16.4
+
+## 0.14.2
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+- @gradio/upload@0.16.3
+- @gradio/atoms@0.16.0
+
+## 0.14.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/atoms@0.15.2
+- @gradio/utils@0.10.2
+- @gradio/upload@0.16.2
+
+## 0.14.0
+
+### Features
+
+- [#10982](https://github.com/gradio-app/gradio/pull/10982) [`a80b312`](https://github.com/gradio-app/gradio/commit/a80b312c081a03b5bd73477305e2f094da512b37) - Add latex to code component languages.  Thanks @ginazhouhuiwu!
+
+### Dependency updates
+
+- @gradio/upload@0.16.1
+- @gradio/atoms@0.15.1
+- @gradio/statustracker@0.10.8
+- @gradio/icons@0.12.0
+
+## 0.13.2
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.7
+- @gradio/atoms@0.15.0
+- @gradio/icons@0.11.0
+- @gradio/upload@0.16.0
+
+## 0.13.1
+
+### Dependency updates
+
+- @gradio/wasm@0.18.1
+- @gradio/upload@0.15.7
+
+## 0.13.0
+
+### Features
+
+- [#10812](https://github.com/gradio-app/gradio/pull/10812) [`6384bcc`](https://github.com/gradio-app/gradio/commit/6384bcc11f13d22f4480e7ad7213486fecec8936) - Jedi-based Python code completion on `gr.Code`.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/atoms@0.14.1
+- @gradio/statustracker@0.10.6
+- @gradio/wasm@0.18.0
+- @gradio/upload@0.15.6
+
+## 0.12.0
+
+### Features
+
+- [#10733](https://github.com/gradio-app/gradio/pull/10733) [`731ab92`](https://github.com/gradio-app/gradio/commit/731ab92001c88d4cf1062acf0a4f1108a4513014) - Autocompletion on code editor component.  Thanks @whitphx!
+
+### Dependency updates
+
+- @gradio/upload@0.15.5
+- @gradio/statustracker@0.10.5
+- @gradio/atoms@0.14.0
+
+## 0.11.2
+
+### Dependency updates
+
+- @gradio/wasm@0.17.4
+- @gradio/upload@0.15.4
+
+## 0.11.1
+
+### Dependency updates
+
+- @gradio/upload@0.15.3
+
+## 0.11.0
+
+### Features
+
+- [#10643](https://github.com/gradio-app/gradio/pull/10643) [`f0a920c`](https://github.com/gradio-app/gradio/commit/f0a920c4934880645fbad783077ae9c7519856ce) - added a show_line_numbers to toggle line numbers in gr.Code().  Thanks @lalitx17!
+
+## 0.10.18
+
+### Dependency updates
+
+- @gradio/upload@0.15.2
+- @gradio/statustracker@0.10.4
+- @gradio/atoms@0.13.3
+
+## 0.10.17
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.3
+- @gradio/atoms@0.13.2
+- @gradio/utils@0.10.1
+- @gradio/upload@0.15.1
+- @gradio/wasm@0.17.3
+
+## 0.10.16
+
+### Dependency updates
+
+- @gradio/upload@0.15.0
+
+## 0.10.15
+
+### Dependency updates
+
+- @gradio/upload@0.14.8
+- @gradio/wasm@0.17.2
+
+## 0.10.14
+
+### Dependency updates
+
+- @gradio/upload@0.14.7
+- @gradio/wasm@0.17.1
+
+## 0.10.13
+
+### Dependency updates
+
+- @gradio/upload@0.14.6
+- @gradio/wasm@0.17.0
+- @gradio/statustracker@0.10.2
+
 ## 0.10.12
 
 ### Dependency updates

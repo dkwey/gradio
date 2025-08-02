@@ -152,7 +152,7 @@
 	{#if gallery}
 		<div class="gallery">
 			{#each selected_samples as sample_row, i}
-				{#if sample_row[0]}
+				{#if sample_row[0] != null}
 					<button
 						class="gallery-item"
 						on:click={() => {
@@ -204,6 +204,10 @@
 							on:click={() => {
 								value = i + page * samples_per_page;
 								gradio.dispatch("click", value);
+								gradio.dispatch("select", {
+									index: value,
+									value: selected_samples[i]
+								});
 							}}
 							on:mouseenter={() => handle_mouseenter(i)}
 							on:mouseleave={() => handle_mouseleave()}

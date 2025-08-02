@@ -47,6 +47,9 @@ class TestCode:
             "_selectable": False,
             "wrap_lines": False,
             "key": None,
+            "preserved_by_key": ["value"],
+            "show_line_numbers": True,
+            "autocomplete": False,
         }
 
     def test_process_example(self):

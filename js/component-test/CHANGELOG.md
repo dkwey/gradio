@@ -1,5 +1,162 @@
 # @self/component-test
 
+## 0.5.28
+
+### Dependency updates
+
+- @gradio/video@0.14.22
+
+## 0.5.27
+
+### Dependency updates
+
+- @gradio/video@0.14.21
+
+## 0.5.26
+
+### Dependency updates
+
+- @gradio/video@0.14.20
+
+## 0.5.25
+
+### Dependency updates
+
+- @gradio/video@0.14.19
+
+## 0.5.24
+
+### Dependency updates
+
+- @gradio/video@0.14.18
+
+## 0.5.23
+
+### Dependency updates
+
+- @gradio/video@0.14.17
+
+## 0.5.22
+
+### Dependency updates
+
+- @gradio/video@0.14.16
+
+## 0.5.21
+
+### Dependency updates
+
+- @gradio/video@0.14.15
+
+## 0.5.20
+
+### Dependency updates
+
+- @gradio/video@0.14.14
+
+## 0.5.19
+
+### Dependency updates
+
+- @gradio/video@0.14.13
+
+## 0.5.18
+
+### Dependency updates
+
+- @gradio/video@0.14.12
+
+## 0.5.17
+
+### Dependency updates
+
+- @gradio/video@0.14.11
+
+## 0.5.16
+
+### Dependency updates
+
+- @gradio/video@0.14.10
+
+## 0.5.15
+
+### Dependency updates
+
+- @gradio/video@0.14.9
+
+## 0.5.14
+
+### Dependency updates
+
+- @gradio/video@0.14.8
+
+## 0.5.13
+
+### Dependency updates
+
+- @gradio/video@0.14.7
+
+## 0.5.12
+
+### Dependency updates
+
+- @gradio/video@0.14.6
+
+## 0.5.11
+
+### Dependency updates
+
+- @gradio/video@0.14.5
+
+## 0.5.10
+
+### Dependency updates
+
+- @gradio/video@0.14.4
+
+## 0.5.9
+
+### Dependency updates
+
+- @gradio/video@0.14.3
+
+## 0.5.8
+
+### Dependency updates
+
+- @gradio/video@0.14.2
+
+## 0.5.7
+
+### Dependency updates
+
+- @gradio/video@0.14.1
+- @self/build@0.2.1
+
+## 0.5.6
+
+### Dependency updates
+
+- @gradio/video@0.14.0
+
+## 0.5.5
+
+### Dependency updates
+
+- @gradio/video@0.13.4
+
+## 0.5.4
+
+### Dependency updates
+
+- @gradio/video@0.13.3
+
+## 0.5.3
+
+### Dependency updates
+
+- @gradio/video@0.13.2
+
 ## 0.5.2
 
 ### Dependency updates

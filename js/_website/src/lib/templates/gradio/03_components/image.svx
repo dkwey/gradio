@@ -10,6 +10,7 @@
     import { style_formatted_text } from "$lib/text";
 
     let obj = get_object("image");
+    let webcam_options_obj = get_object("webcamoptions")
 </script>
 
 <!--- Title -->
@@ -60,7 +61,7 @@ def predict(···) -> np.ndarray | PIL.Image.Image | str | Path | None
 
 <!--- Initialization -->
 ### Initialization
-<ParamTable parameters={obj.parameters} />
+<ParamTable parameters={obj.parameters} anchor_links={obj.name}/>
 
 
 {#if obj.string_shortcuts && obj.string_shortcuts.length > 0}
@@ -103,6 +104,29 @@ demo.launch()
 ### Event Listeners 
 <FunctionsSection fns={obj.fns} event_listeners={true} />
 {/if}
+
+<!-- Helper Classes -->
+### Helper Classes 
+<div style="margin-left: 3rem">
+
+<!-- WEBCAM OPTIONS -->
+<!--- Title -->
+### Webcam Options
+
+<!--- Usage -->
+```python
+gradio.WebcamOptions(···)
+```
+
+<!--- Description -->
+#### Description
+## {@html style_formatted_text(webcam_options_obj.description)}
+
+<!--- Initialization -->
+#### Initialization
+<ParamTable parameters={webcam_options_obj.parameters} anchor_links={webcam_options_obj.name}/>
+
+</div>
 
 {#if obj.guides && obj.guides.length > 0}
 <!--- Guides -->

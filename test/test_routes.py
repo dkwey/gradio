@@ -1,6 +1,7 @@
 """Contains tests for networking.py and app.py"""
 
 import functools
+import inspect
 import json
 import os
 import pickle
@@ -37,6 +38,8 @@ from gradio.route_utils import (
     API_PREFIX,
     FnIndexInferError,
     compare_passwords_securely,
+    get_api_call_path,
+    get_request_origin,
     get_root_url,
     starts_with_protocol,
 )
@@ -72,6 +75,11 @@ class TestRoutes:
         response = test_client.get("/favicon.ico")
         assert response.status_code == 200
 
+    def test_openapi_route(self, test_client):
+        response = test_client.get(f"{API_PREFIX}/openapi.json")
+        assert response.status_code == 200
+        assert response.json()["openapi"] == "3.0.2"
+
     def test_upload_path(self, test_client):
         with open("test/test_files/alphabet.txt", "rb") as f:
             response = test_client.post(f"{API_PREFIX}/upload", files={"files": f})
@@ -95,6 +103,15 @@ class TestRoutes:
         assert file.endswith(".txt")
         with open(file, "rb") as saved_file:
             assert saved_file.read() == b"abcdefghijklmnopqrstuvwxyz"
+
+    def test_header_size_limit(self, test_client):
+        with open("test/test_files/alphabet.txt", "rb") as f:
+            long_filename = "5" * 9000
+            response = test_client.post(
+                f"{API_PREFIX}/upload",
+                files={"files": (long_filename, f, "text/plain")},
+            )
+        assert response.status_code == 413
 
     def test_predict_route(self, test_client):
         response = test_client.post(
@@ -505,6 +522,40 @@ class TestRoutes:
             assert client.get("/demo", headers={"user": "abubakar"}).is_success
             assert not client.get("/demo").is_success
 
+    def test_mount_gradio_app_with_lifespan_state(
+        self,
+    ):
+        from fastapi.responses import PlainTextResponse
+
+        @asynccontextmanager
+        async def lifespan(_):
+            yield {"hello": "world"}
+
+        app = FastAPI(lifespan=lifespan)
+
+        gr.mount_gradio_app(app, Blocks(), "/gradio")
+
+        @app.get("/")
+        async def test_route(request: Request):
+            return PlainTextResponse(request.state.hello)
+
+        with TestClient(app) as client:
+            assert client.get("/").is_success
+            assert client.get("/").text.strip() == "world"
+
+    def test_gradio_launch_lifespan_state(self, connect):
+        @asynccontextmanager
+        async def lifespan(_):
+            yield {"hello": "world"}
+
+        def predict(request: gr.Request):
+            return request.state.hello
+
+        demo = gr.Interface(predict, None, "textbox")
+        with connect(demo, app_kwargs={"lifespan": lifespan}) as client:
+            result = client.predict(None, api_name="/predict")
+            assert result == "world"
+
     def test_static_file_missing(self, test_client):
         response = test_client.get(rf"{API_PREFIX}/static/not-here.js")
         assert response.status_code == 404
@@ -679,7 +730,7 @@ class TestRoutes:
 
         app, _, _ = demo.launch(prevent_thread_lock=True)
         client = TestClient(app)
-        response = client.get(f"{API_PREFIX}/monitoring")
+        response = client.get("/monitoring")
         assert response.status_code == 200
 
     def test_monitoring_link_disabled(self):
@@ -690,7 +741,7 @@ class TestRoutes:
 
         app, _, _ = demo.launch(prevent_thread_lock=True, enable_monitoring=False)
         client = TestClient(app)
-        response = client.get(f"{API_PREFIX}/monitoring")
+        response = client.get("/monitoring")
         assert response.status_code == 403
 
 
@@ -783,14 +834,14 @@ class TestAuthenticatedRoutes:
         )
 
         response = client.get(
-            f"{API_PREFIX}/monitoring",
+            "/monitoring",
         )
         assert response.status_code == 200
 
         response = client.get("/logout")
 
         response = client.get(
-            f"{API_PREFIX}/monitoring",
+            "/monitoring",
         )
         assert response.status_code == 401
 
@@ -1160,16 +1211,16 @@ class TestShowAPI:
     @patch.object(wasm_utils, "IS_WASM", True)
     def test_show_api_false_when_is_wasm_true(self):
         interface = Interface(lambda x: x, "text", "text", examples=[["hannah"]])
-        assert (
-            interface.show_api is False
-        ), "show_api should be False when IS_WASM is True"
+        assert interface.show_api_in_footer is False, (
+            "show_api should be False when IS_WASM is True"
+        )
 
     @patch.object(wasm_utils, "IS_WASM", False)
     def test_show_api_true_when_is_wasm_false(self):
         interface = Interface(lambda x: x, "text", "text", examples=[["hannah"]])
-        assert (
-            interface.show_api is True
-        ), "show_api should be True when IS_WASM is False"
+        assert interface.show_api_in_footer is True, (
+            "show_api should be True when IS_WASM is False"
+        )
 
 
 def test_component_server_endpoints(connect):
@@ -1344,7 +1395,7 @@ class TestSimpleAPIRoutes:
             def fn_2(x):
                 for i in range(len(x)):
                     time.sleep(0.5)
-                    yield f"Hello, {x[:i+1]}!"
+                    yield f"Hello, {x[: i + 1]}!"
                 if len(x) < 3:
                     raise ValueError("Small input")
 
@@ -1671,3 +1722,200 @@ def test_file_without_meta_key_not_moved():
             assert req.status_code == 500
     finally:
         demo.close()
+
+
+def test_mount_gradio_app_args_match_launch_args():
+    """Test that all arguments in Blocks.launch() are also valid in mount_gradio_app()."""
+    # Get the parameters from both functions
+    launch_params = inspect.signature(gr.Blocks.launch).parameters
+    mount_params = inspect.signature(routes.mount_gradio_app).parameters
+
+    # Parameters that are intentionally not included in mount_gradio_app
+    exception_list = {
+        "inline",
+        "inbrowser",
+        "prevent_thread_lock",
+        "debug",
+        "quiet",
+        "height",
+        "width",
+        "ssl_keyfile",
+        "ssl_certfile",
+        "ssl_keyfile_password",
+        "ssl_verify",
+        "share",
+        "share_server_address",
+        "share_server_protocol",
+        "share_server_tls_certificate",
+        "state_session_capacity",
+        "_frontend",
+        "self",
+        "strict_cors",
+        "max_threads",
+        "i18n",
+    }
+
+    missing_params = []
+    for param_name in launch_params:
+        if param_name not in exception_list and param_name not in mount_params:
+            missing_params.append(param_name)
+
+    assert not missing_params, (
+        f"Parameters in launch() but missing in mount_gradio_app(): {missing_params}"
+    )
+
+
+@pytest.mark.parametrize(
+    "server, path",
+    [
+        # ASGI HTTP Connection Scope. Ref: https://asgi.readthedocs.io/en/latest/specs/www.html#http-connection-scopeg
+        (
+            None,  # 'server' is optional. Requests from Gradio-Lite will be this case.
+            f"{API_PREFIX}/queue/join",
+        ),
+        (("localhost", 7860), f"{API_PREFIX}/queue/join"),
+        (
+            ("localhost", 7860),
+            f"{API_PREFIX}/queue/join?__theme=dark",  # With query params.
+        ),
+        (
+            ("localhost", 7860),
+            f"{API_PREFIX}/queue/join?foo=bar&__theme=dark",  # With multiple query params.
+        ),
+        (
+            None,
+            f"http://localhost:7860{API_PREFIX}/queue/join?__theme=dark",  # Putting the server in the path may be invalid but we test it anyway.
+        ),
+    ],
+)
+def test_get_api_call_path_queue_join(server, path):
+    scope = {"type": "http", "headers": [], "server": server, "path": path}
+    request = Request(scope)
+
+    path = get_api_call_path(request)
+    assert path == f"{API_PREFIX}/queue/join"
+
+
+@pytest.mark.parametrize(
+    "server, path, expected",
+    [
+        (
+            ("localhost", 7860),
+            f"{API_PREFIX}/call/predict",
+            f"{API_PREFIX}/call/predict",
+        ),
+        (
+            None,
+            f"http://localhost:7860{API_PREFIX}/call/predict",
+            f"{API_PREFIX}/call/predict",
+        ),
+        (
+            ("localhost", 7860),
+            f"{API_PREFIX}/call/custom_function/with/extra/parts",
+            f"{API_PREFIX}/call/custom_function/with/extra/parts",
+        ),
+        (
+            None,
+            f"http://localhost:7860{API_PREFIX}/call/custom_function/with/extra/parts",
+            f"{API_PREFIX}/call/custom_function/with/extra/parts",
+        ),
+        (  # Query params are ignored.
+            ("localhost", 7860),
+            f"{API_PREFIX}/call/custom_function/with/extra/parts?__theme=light",
+            f"{API_PREFIX}/call/custom_function/with/extra/parts",
+        ),
+        (  # Query params are ignored.
+            None,
+            f"http://localhost:7860{API_PREFIX}/call/custom_function/with/extra/parts?__theme=light",
+            f"{API_PREFIX}/call/custom_function/with/extra/parts",
+        ),
+    ],
+)
+def test_get_api_call_path_generic_call(server, path, expected):
+    scope = {"type": "http", "headers": [], "server": server, "path": path}
+    request = Request(scope)
+    path = get_api_call_path(request)
+    assert path == expected
+
+
+@pytest.mark.parametrize(
+    "headers, server, route_path, expected_origin",
+    [
+        (
+            {},
+            ("localhost", 7860),
+            "/gradio_api/predict",
+            httpx.URL("http://localhost:7860"),
+        ),
+        (
+            {"x-forwarded-host": "example.com"},
+            ("localhost", 7860),
+            "/gradio_api/predict",
+            httpx.URL("http://example.com"),
+        ),
+        (
+            {"x-forwarded-host": "example.com", "x-forwarded-proto": "https"},
+            ("localhost", 7860),
+            "/gradio_api/predict",
+            httpx.URL("https://example.com"),
+        ),
+        (
+            {
+                "x-forwarded-host": "example.com,internal.example.com",
+                "x-forwarded-proto": "https,http",
+            },
+            ("localhost", 7860),
+            "/gradio_api/predict",
+            httpx.URL("https://example.com"),
+        ),
+    ],
+)
+def test_get_request_origin_with_headers(headers, server, route_path, expected_origin):
+    scope = {
+        "type": "http",
+        "headers": [(k.encode(), v.encode()) for k, v in headers.items()],
+        "server": server,
+        "path": route_path,
+    }
+    request = Request(scope)
+    origin = get_request_origin(request, route_path)
+    assert origin == expected_origin
+
+
+def test_deep_link_unique_per_session():
+    import requests
+    from gradio_client import Client
+
+    with gr.Blocks() as demo:
+        text = gr.Textbox()
+        out = gr.Textbox(label="output")
+        gr.DeepLinkButton()
+        text.submit(fn=lambda x: gr.Textbox(x, lines=int(x)), inputs=text, outputs=out)
+
+    _, url, _ = demo.launch(prevent_thread_lock=True)
+    client_1 = Client(url)
+    client_2 = Client(url)
+    _ = client_1.predict(x="9", api_name="/lambda_1")
+    _ = client_2.predict(x="6", api_name="/lambda_1")
+
+    link_1 = requests.get(
+        f"{url}/gradio_api/deep_link?session_hash={client_1.session_hash}"
+    ).text
+    link_2 = requests.get(
+        f"{url}/gradio_api/deep_link?session_hash={client_2.session_hash}"
+    ).text
+
+    config_1 = requests.get(f"{url}/config?deep_link={link_1[1:-1]}").json()
+    config_2 = requests.get(f"{url}/config?deep_link={link_2[1:-1]}").json()
+    verified_configs = [False, False]
+    for i, config in enumerate([config_1, config_2]):
+        for component in config["components"]:
+            if component["props"].get("label", "") == "output":
+                number = 9
+                if i == 1:
+                    number = 6
+                verified_configs[i] = component["props"][
+                    "lines"
+                ] == number and component["props"]["value"][0] == str(number)
+
+    assert all(verified_configs)

@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import importlib.resources
 import inspect
+import io
 import json
 import math
 import mimetypes
@@ -63,6 +64,7 @@ from starlette.responses import RedirectResponse
 
 import gradio
 from gradio import ranged_response, route_utils, utils, wasm_utils
+from gradio.brotli_middleware import BrotliMiddleware
 from gradio.context import Context
 from gradio.data_classes import (
     CancelBody,
@@ -77,6 +79,7 @@ from gradio.data_classes import (
     UserProvidedPath,
 )
 from gradio.exceptions import Error, InvalidPathError
+from gradio.i18n import I18n
 from gradio.node_server import (
     start_node_server,
 )
@@ -95,6 +98,7 @@ from gradio.route_utils import (  # noqa: F401
     create_lifespan_handler,
     move_uploaded_files_to_cache,
 )
+from gradio.screen_recording_utils import process_video_with_ffmpeg
 from gradio.server_messages import (
     CloseStreamMessage,
     EstimationMessage,
@@ -115,6 +119,8 @@ from gradio.utils import (
 if TYPE_CHECKING:
     from gradio.blocks import Block
 
+import shutil
+import tempfile
 
 mimetypes.init()
 
@@ -149,6 +155,10 @@ XSS_SAFE_MIMETYPES = {
     "text/plain",
     "application/json",
 }
+
+DEFAULT_TEMP_DIR = os.environ.get("GRADIO_TEMP_DIR") or str(
+    Path(tempfile.gettempdir()) / "gradio"
+)
 
 
 class ORJSONResponse(JSONResponse):
@@ -296,7 +306,7 @@ class App(FastAPI):
         self.cwd = os.getcwd()
         self.favicon_path = blocks.favicon_path
         self.tokens = {}
-        self.root_path = blocks.root_path
+        self.root_path = blocks.root_path or blocks.custom_mount_path or ""
         self.state_holder.set_blocks(blocks)
 
     def get_blocks(self) -> gradio.Blocks:
@@ -327,26 +337,80 @@ class App(FastAPI):
         self._asyncio_tasks = []
 
     @staticmethod
+    def setup_mcp_server(
+        blocks: gradio.Blocks,
+        app_kwargs: dict[str, Any],
+        mcp_server: bool | None = None,
+    ):
+        mcp_subpath = API_PREFIX + "/mcp"
+        if mcp_server is None:
+            mcp_server = os.environ.get("GRADIO_MCP_SERVER", "False").lower() == "true"
+        if mcp_server:
+            try:
+                import gradio.mcp
+            except ImportError as e:
+                raise ImportError(
+                    'In order to use `mcp_server=True`, you must install gradio with the `mcp` extra. Please install it with `pip install "gradio[mcp]"`'
+                ) from e
+            try:
+                blocks.mcp_server_obj = gradio.mcp.GradioMCPServer(blocks)
+                blocks.mcp_server = True
+                user_lifespan = None
+                if "lifespan" in app_kwargs:
+                    user_lifespan = app_kwargs["lifespan"]
+
+                @contextlib.asynccontextmanager
+                async def _lifespan(app: App):
+                    async with contextlib.AsyncExitStack() as stack:
+                        if blocks.mcp_server_obj:
+                            await stack.enter_async_context(
+                                blocks.mcp_server_obj.lifespan(app)
+                            )
+                        if user_lifespan is not None:
+                            await stack.enter_async_context(user_lifespan(app))
+                        yield
+
+                app_kwargs["lifespan"] = _lifespan
+            except Exception as e:
+                blocks.mcp_server = False
+                blocks.mcp_error = f"Error launching MCP server: {e}"
+
+        blocks.config = (
+            blocks.get_config_file()
+        )  # Because the config should include the fact that the MCP server is enabled
+        return mcp_subpath
+
+    @staticmethod
     def create_app(
         blocks: gradio.Blocks,
         app_kwargs: dict[str, Any] | None = None,
         auth_dependency: Callable[[fastapi.Request], str | None] | None = None,
         strict_cors: bool = True,
         ssr_mode: bool = False,
+        mcp_server: bool | None = None,
     ) -> App:
         app_kwargs = app_kwargs or {}
         app_kwargs.setdefault("default_response_class", ORJSONResponse)
+        mcp_subpath = App.setup_mcp_server(blocks, app_kwargs, mcp_server)
+
         delete_cache = blocks.delete_cache or (None, None)
         app_kwargs["lifespan"] = create_lifespan_handler(
             app_kwargs.get("lifespan", None), *delete_cache
         )
         app = App(auth_dependency=auth_dependency, **app_kwargs, debug=True)
+        if blocks.mcp_server_obj:
+            blocks.mcp_server_obj.launch_mcp_on_sse(app, mcp_subpath, blocks.root_path)
         router = APIRouter(prefix=API_PREFIX)
 
         app.configure_app(blocks)
 
         if not wasm_utils.IS_WASM:
             app.add_middleware(CustomCORSMiddleware, strict_cors=strict_cors)
+            app.add_middleware(
+                BrotliMiddleware,
+                quality=4,
+                excluded_handlers=[mcp_subpath],
+            )
 
         if ssr_mode:
 
@@ -364,14 +428,7 @@ class App(FastAPI):
                 if (
                     getattr(blocks, "node_process", None) is not None
                     and blocks.node_port is not None
-                    and not path.startswith("/gradio_api")
-                    and path not in ["/config", "/favicon.ico"]
-                    and not path.startswith("/theme")
-                    and not path.startswith("/svelte")
-                    and not path.startswith("/static")
-                    and not path.startswith("/login")
-                    and not path.startswith("/logout")
-                    and not path.startswith("/manifest.json")
+                    and not any(path.startswith(f"/{url}") for url in INTERNAL_ROUTES)
                 ):
                     if App.app_port is None:
                         App.app_port = request.url.port or int(
@@ -408,7 +465,11 @@ class App(FastAPI):
             if (app.auth is None and app.auth_dependency is None) or user is not None:
                 return
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "Not authenticated",
+                    "auth_message": blocks.auth_message,
+                },
             )
 
         @router.get("/token")
@@ -457,10 +518,17 @@ class App(FastAPI):
 
         @app.post("/login")
         @app.post("/login/")
-        def login(form_data: OAuth2PasswordRequestForm = Depends()):
+        def login(
+            request: fastapi.Request, form_data: OAuth2PasswordRequestForm = Depends()
+        ):
             username, password = form_data.username.strip(), form_data.password
             if app.auth is None:
-                return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+                root = route_utils.get_root_url(
+                    request=request,
+                    route_path="/login",
+                    root_path=app.root_path,
+                )
+                return RedirectResponse(url=root, status_code=status.HTTP_302_FOUND)
             if (
                 not callable(app.auth)
                 and username in app.auth
@@ -497,8 +565,13 @@ class App(FastAPI):
         else:
 
             @app.get("/logout")
-            def logout(user: str = Depends(get_current_user)):
-                response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+            def logout(request: fastapi.Request, user: str = Depends(get_current_user)):
+                root = route_utils.get_root_url(
+                    request=request,
+                    route_path="/logout",
+                    root_path=app.root_path,
+                )
+                response = RedirectResponse(url=root, status_code=status.HTTP_302_FOUND)
                 response.delete_cookie(key=f"access-token-{app.cookie_id}", path="/")
                 response.delete_cookie(
                     key=f"access-token-unsecure-{app.cookie_id}", path="/"
@@ -522,21 +595,98 @@ class App(FastAPI):
                 )
             )
 
+        def attach_page(page):
+            @app.get(f"/{page}", response_class=HTMLResponse)
+            @app.get(f"/{page}/", response_class=HTMLResponse)
+            def page_route(
+                request: fastapi.Request,
+                user: str = Depends(get_current_user),
+                deep_link: str = "",
+            ):
+                return main(request, user, page, deep_link)
+
+        for pageset in blocks.pages:
+            page = pageset[0]
+            if page != "":
+                attach_page(page)
+
+        def load_deep_link(
+            deep_link: str, config: dict[str, Any], page: str | None = None
+        ):
+            components = config["components"]
+            try:
+                path = (
+                    Path(app.uploaded_file_dir)
+                    / "deep_links"
+                    / deep_link
+                    / "state.json"
+                )
+
+                if path.exists():
+                    components = orjson.loads(path.read_bytes())
+                    deep_link_state = "valid"
+                else:
+                    deep_link_state = "invalid"
+            except (FileNotFoundError, OSError, orjson.JSONDecodeError):
+                deep_link_state = "invalid"
+                components = []
+            if page:
+                components = [
+                    component
+                    for component in components
+                    if component["id"] in config["page"][page]["components"]
+                ]
+            return components, deep_link_state
+
         @app.head("/", response_class=HTMLResponse)
         @app.get("/", response_class=HTMLResponse)
-        def main(request: fastapi.Request, user: str = Depends(get_current_user)):
+        def main(
+            request: fastapi.Request,
+            user: str = Depends(get_current_user),
+            page: str = "",
+            deep_link: str = "",
+        ):
             mimetypes.add_type("application/javascript", ".js")
             blocks = app.get_blocks()
             root = route_utils.get_root_url(
-                request=request, route_path="/", root_path=app.root_path
+                request=request,
+                route_path=f"/{page}",
+                root_path=app.root_path,
             )
             if (app.auth is None and app.auth_dependency is None) or user is not None:
                 config = utils.safe_deepcopy(blocks.config)
-                config = route_utils.update_root_in_config(config, root)
+                deep_link_state = "none"
+                components = [
+                    component
+                    for component in config["components"]
+                    if component["id"] in config["page"][page]["components"]
+                ]
+                if deep_link:
+                    components, deep_link_state = load_deep_link(
+                        deep_link,
+                        config,  # type: ignore
+                        page,
+                    )
                 config["username"] = user
+                config["deep_link_state"] = deep_link_state
+                config["components"] = components  # type: ignore
+                config["dependencies"] = [
+                    dependency
+                    for dependency in config.get("dependencies", [])
+                    if dependency["id"] in config["page"][page]["dependencies"]
+                ]
+                config["layout"] = config["page"][page]["layout"]
+                config["current_page"] = page
+                # Update root after loading the deep link state (if applicable)
+                # so that static files are served from the correct root
+                config = route_utils.update_root_in_config(config, root)
             elif app.auth_dependency:
                 raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "error": "Not authenticated",
+                        "auth_message": blocks.auth_message,
+                    },
                 )
             else:
                 config = {
@@ -544,6 +694,11 @@ class App(FastAPI):
                     "auth_message": blocks.auth_message,
                     "space_id": blocks.space_id,
                     "root": root,
+                    "page": {"": {"layout": {}}},
+                    "pages": [""],
+                    "components": [],
+                    "dependencies": [],
+                    "current_page": "",
                 }
 
             try:
@@ -551,7 +706,7 @@ class App(FastAPI):
                     "frontend/share.html" if blocks.share else "frontend/index.html"
                 )
                 gradio_api_info = api_info(request)
-                return templates.TemplateResponse(
+                resp = templates.TemplateResponse(
                     request=request,
                     name=template,
                     context={
@@ -559,6 +714,7 @@ class App(FastAPI):
                         "gradio_api_info": gradio_api_info,
                     },
                 )
+                return resp
             except TemplateNotFound as err:
                 if blocks.share:
                     raise ValueError(
@@ -570,6 +726,27 @@ class App(FastAPI):
                         "Did you install Gradio from source files? You need to build "
                         "the frontend by running /scripts/build_frontend.sh"
                     ) from err
+
+        @app.get("/gradio_api/deep_link")
+        def deep_link(session_hash: str):
+            if session_hash in app.state_holder:
+                components = [
+                    utils.safe_deepcopy(c)
+                    for c in app.state_holder[session_hash].components
+                ]
+                components_json = orjson.dumps(
+                    components,
+                    option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_PASSTHROUGH_DATETIME,
+                    default=str,
+                )
+                deep_link = route_utils.create_url_safe_hash(components_json)
+                directory = Path(app.uploaded_file_dir) / "deep_links" / deep_link
+                directory.mkdir(parents=True, exist_ok=True)
+                with open(directory / "state.json", "wb") as f:
+                    f.write(components_json)
+                return deep_link
+            else:
+                return ""
 
         @router.get("/info/", dependencies=[Depends(login_check)])
         @router.get("/info", dependencies=[Depends(login_check)])
@@ -586,15 +763,121 @@ class App(FastAPI):
                 app.api_info = api_info
             return app.api_info
 
+        @router.get("/openapi.json", dependencies=[Depends(login_check)])
+        def openapi_schema(request: fastapi.Request):
+            """Generate an OpenAPI schema from the Gradio app's API info."""
+            info = api_info(request)
+            schema = {
+                "openapi": "3.0.2",
+                "info": {
+                    "title": getattr(app.get_blocks(), "title", "Gradio App"),
+                    "description": getattr(app.get_blocks(), "description", ""),
+                    "version": VERSION,
+                },
+                "paths": {},
+                "components": {"schemas": {}},
+            }
+
+            for endpoint_path, endpoint_info in info.get("named_endpoints", {}).items():  # type: ignore
+                if not endpoint_info.get("show_api", True):
+                    continue
+                path_item = {
+                    "post": {
+                        "summary": endpoint_info.get(
+                            "description", f"Endpoint {endpoint_path}"
+                        ),
+                        "description": endpoint_info.get("description", ""),
+                        "operationId": endpoint_path.strip("/").replace("/", "_"),
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {}}
+                                }
+                            },
+                        },
+                        "responses": {
+                            "200": {
+                                "description": "Successful response",
+                                "content": {
+                                    "application/json": {
+                                        "schema": {"type": "object", "properties": {}}
+                                    }
+                                },
+                            }
+                        },
+                    }
+                }
+
+                request_properties = path_item["post"]["requestBody"]["content"][
+                    "application/json"
+                ]["schema"]["properties"]
+                for param in endpoint_info.get("parameters", []):
+                    param_name = param["parameter_name"]
+                    param_type = param.get("type", {})
+
+                    if "additional_description" in param_type:
+                        param_type = dict(param_type)
+                        param_type.pop("additional_description", None)
+
+                    if "properties" in param_type and "type" not in param_type:
+                        param_type = dict(param_type)
+                        param_type["type"] = "object"
+
+                    request_properties[param_name] = param_type
+
+                    if "example_input" in param:
+                        if (
+                            "examples"
+                            not in path_item["post"]["requestBody"]["content"][
+                                "application/json"
+                            ]
+                        ):
+                            path_item["post"]["requestBody"]["content"][
+                                "application/json"
+                            ]["examples"] = {"example1": {"value": {}}}
+                        path_item["post"]["requestBody"]["content"]["application/json"][
+                            "examples"
+                        ]["example1"]["value"][param_name] = param["example_input"]
+
+                response_properties = path_item["post"]["responses"]["200"]["content"][
+                    "application/json"
+                ]["schema"]["properties"]
+                for i, ret in enumerate(endpoint_info.get("returns", [])):
+                    ret_name = f"output_{i}" if i > 0 else "output"
+                    ret_type = ret.get("type", {})
+
+                    if "additional_description" in ret_type:
+                        ret_type = dict(ret_type)
+                        ret_type.pop("additional_description", None)
+
+                    if "properties" in ret_type and "type" not in ret_type:
+                        ret_type = dict(ret_type)
+                        ret_type["type"] = "object"
+
+                    response_properties[ret_name] = ret_type
+
+                schema["paths"][f"/run{endpoint_path}"] = path_item
+
+            return schema
+
         @app.get("/config/", dependencies=[Depends(login_check)])
         @app.get("/config", dependencies=[Depends(login_check)])
-        def get_config(request: fastapi.Request):
+        def get_config(request: fastapi.Request, deep_link: str = ""):
             config = utils.safe_deepcopy(app.get_blocks().config)
             root = route_utils.get_root_url(
                 request=request, route_path="/config", root_path=app.root_path
             )
-            config = route_utils.update_root_in_config(config, root)
             config["username"] = get_current_user(request)
+            if deep_link:
+                components, deep_link_state = load_deep_link(deep_link, config, page="")  # type: ignore
+                config["components"] = components  # type: ignore
+                config["deep_link_state"] = deep_link_state
+            if hasattr(blocks, "i18n_instance") and blocks.i18n_instance:
+                config["i18n_translations"] = blocks.i18n_instance.translations_dict
+            else:
+                config["i18n_translations"] = None
+            config = route_utils.update_root_in_config(config, root)
             return ORJSONResponse(content=config)
 
         @app.get("/static/{path:path}")
@@ -650,7 +933,7 @@ class App(FastAPI):
             key = f"{id}-{type}-{file_name}"
 
             if key not in app.custom_component_hashes:
-                app.custom_component_hashes[key] = hashlib.md5(
+                app.custom_component_hashes[key] = hashlib.sha256(
                     Path(path).read_text(encoding="utf-8").encode()
                 ).hexdigest()
 
@@ -710,8 +993,13 @@ class App(FastAPI):
                 raise HTTPException(403, f"File not allowed: {path_or_url}.")
 
             abs_path = utils.abspath(path_or_url)
-            if abs_path.is_dir() or not abs_path.exists():
-                raise HTTPException(403, f"File not allowed: {path_or_url}.")
+            # Catch potential permission errors to not display the full traceback
+            # see https://github.com/gradio-app/gradio/issues/11194
+            try:
+                if abs_path.is_dir() or not abs_path.exists():
+                    raise HTTPException(403, f"File not allowed: {path_or_url}.")
+            except Exception as e:
+                raise HTTPException(403, f"File not allowed: {path_or_url}.") from e
 
             from gradio.data_classes import _StaticFiles
 
@@ -807,6 +1095,10 @@ class App(FastAPI):
             for segment in stream.segments:
                 playlist += f"#EXTINF:{segment['duration']:.3f},\n"
                 playlist += f"{segment['id']}{segment['extension']}\n"  # type: ignore
+                # HLS expects the start time of the video segments to be continuous
+                # Instead of re-encoding the user video chunks, we add a discontinuity tag
+                if segment["extension"] == ".ts":
+                    playlist += "#EXT-X-DISCONTINUITY\n"
 
             if stream.ended:
                 playlist += "#EXT-X-ENDLIST\n"
@@ -889,34 +1181,28 @@ class App(FastAPI):
             """
             heartbeat_rate = 0.25 if os.getenv("GRADIO_IS_E2E_TEST", None) else 15
 
-            async def wait():
-                await asyncio.sleep(heartbeat_rate)
-                return "wait"
-
-            async def stop_stream():
-                await app.stop_event.wait()
-                return "stop"
-
             async def iterator():
+                stop_stream_task = asyncio.create_task(app.stop_event.wait())
                 while True:
                     try:
                         yield "data: ALIVE\n\n"
                         # We need to close the heartbeat connections as soon as the server stops
                         # otherwise the server can take forever to close
-                        wait_task = asyncio.create_task(wait())
-                        stop_stream_task = asyncio.create_task(stop_stream())
+                        wait_task = asyncio.create_task(asyncio.sleep(heartbeat_rate))
                         done, _ = await asyncio.wait(
                             [wait_task, stop_stream_task],
                             return_when=asyncio.FIRST_COMPLETED,
                         )
-                        done = [d.result() for d in done]
-                        if "stop" in done:
+                        if stop_stream_task in done:
                             raise asyncio.CancelledError()
                     except asyncio.CancelledError:
+                        if not stop_stream_task.done():
+                            stop_stream_task.cancel()
+
                         req = Request(request, username, session_hash=session_hash)
                         root_path = route_utils.get_root_url(
                             request=request,
-                            route_path=f"{API_PREFIX}/hearbeat/{session_hash}",
+                            route_path=f"{API_PREFIX}/heartbeat/{session_hash}",
                             root_path=app.root_path,
                         )
                         body = PredictBodyInternal(
@@ -928,7 +1214,7 @@ class App(FastAPI):
                             if any(t for t in dep.targets if t[1] == "unload")
                         ]
                         for fn_index in unload_fn_indices:
-                            # The task runnning this loop has been cancelled
+                            # The task running this loop has been cancelled
                             # so we add tasks in the background
                             background_tasks.add_task(
                                 route_utils.call_process_api,
@@ -1142,7 +1428,6 @@ class App(FastAPI):
                         ):
                             raise HTTPException(
                                 status_code=status.HTTP_404_NOT_FOUND,
-                                detail="Session not found.",
                             )
 
                         heartbeat_rate = 15
@@ -1198,6 +1483,7 @@ class App(FastAPI):
                 except BaseException as e:
                     message = UnexpectedErrorMessage(
                         message=str(e),
+                        session_not_found=isinstance(e, HTTPException),
                     )
                     response = process_msg(message)
                     if isinstance(e, asyncio.CancelledError):
@@ -1304,7 +1590,7 @@ class App(FastAPI):
             return app.get_blocks()._queue.get_status()
 
         @router.get("/upload_progress")
-        def get_upload_progress(upload_id: str, request: fastapi.Request):
+        async def get_upload_progress(upload_id: str, request: fastapi.Request):
             async def sse_stream(request: fastapi.Request):
                 last_heartbeat = time.perf_counter()
                 is_done = False
@@ -1338,6 +1624,13 @@ class App(FastAPI):
                             message = {"msg": "heartbeat"}
                             yield f"data: {json.dumps(message)}\n\n"
                             last_heartbeat = time.perf_counter()
+
+            try:
+                await asyncio.wait_for(
+                    file_upload_statuses.is_tracked(upload_id), timeout=3
+                )
+            except (asyncio.TimeoutError, TimeoutError):
+                return PlainTextResponse("Upload not found", status_code=404)
 
             return StreamingResponse(
                 sse_stream(request),
@@ -1437,36 +1730,84 @@ class App(FastAPI):
             else:
                 return "User-agent: *\nDisallow: "
 
+        @app.get("/pwa_icon")
+        @app.get("/pwa_icon/{size}")
+        async def pwa_icon(size: int | None = None):
+            blocks = app.get_blocks()
+            favicon_path = blocks.favicon_path
+            if favicon_path is None:
+                raise HTTPException(status_code=404)
+
+            if size is None:
+                return FileResponse(favicon_path)
+
+            import PIL.Image
+
+            img = PIL.Image.open(favicon_path)
+            img = img.resize((size, size))
+
+            img_byte_array = io.BytesIO()
+            img.save(img_byte_array, format="PNG")
+            img_byte_array.seek(0)
+
+            return StreamingResponse(
+                io.BytesIO(img_byte_array.read()), media_type="image/png"
+            )
+
         @app.get("/manifest.json")
         def manifest_json():
             if not blocks.pwa:
                 raise HTTPException(status_code=404)
 
+            favicon_path = blocks.favicon_path
+            if isinstance(favicon_path, Path):
+                favicon_path = str(favicon_path)
+            if favicon_path is None:
+                icons = [
+                    {
+                        "src": "static/img/logo_nosize.svg",
+                        "sizes": "any",
+                        "type": "image/svg+xml",
+                        "purpose": "any",
+                    },
+                ]
+            elif favicon_path.endswith(".svg"):
+                icons = [
+                    {
+                        "src": app.url_path_for("pwa_icon"),
+                        "sizes": "any",
+                        "type": "image/svg+xml",
+                        "purpose": "any",
+                    },
+                ]
+            else:
+                icons = [
+                    {
+                        "src": app.url_path_for("pwa_icon", size=192),
+                        "sizes": "192x192",
+                        "type": "image/png",
+                        "purpose": "any",
+                    },
+                    {
+                        "src": app.url_path_for("pwa_icon", size=512),
+                        "sizes": "512x512",
+                        "type": "image/png",
+                        "purpose": "any",
+                    },
+                ]
+
             return ORJSONResponse(
                 content={
                     # NOTE: Required members: https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable#required_manifest_members
                     "name": app.get_blocks().title or "Gradio",
-                    "icons": [
-                        {
-                            "src": "static/img/logo192.svg",
-                            "sizes": "192x192",
-                            "type": "image/svg+xml",
-                            "purpose": "any",
-                        },
-                        {
-                            "src": "static/img/logo512.svg",
-                            "sizes": "512x512",
-                            "type": "image/svg+xml",
-                            "purpose": "any",
-                        },
-                    ],
+                    "icons": icons,
                     "start_url": "./",
                     "display": "standalone",
                 },
                 media_type="application/manifest+json",
             )
 
-        @router.get("/monitoring", dependencies=[Depends(login_check)])
+        @app.get("/monitoring", dependencies=[Depends(login_check)])
         async def analytics_login(request: fastapi.Request):
             if not blocks.enable_monitoring:
                 raise HTTPException(
@@ -1481,7 +1822,7 @@ class App(FastAPI):
             print(f"* Monitoring URL: {monitoring_url} *")
             return HTMLResponse("See console for monitoring URL.")
 
-        @router.get("/monitoring/{key}")
+        @app.get("/monitoring/{key}")
         async def analytics_dashboard(key: str):
             if not blocks.enable_monitoring:
                 raise HTTPException(
@@ -1493,7 +1834,9 @@ class App(FastAPI):
                     from gradio.monitoring_dashboard import data
                     from gradio.monitoring_dashboard import demo as dashboard
 
-                    mount_gradio_app(app, dashboard, path=analytics_url)
+                    mount_gradio_app(
+                        app, dashboard, path=analytics_url, mcp_server=False
+                    )
                     dashboard._queue.start()
                     analytics = app.get_blocks()._queue.event_analytics
                     data["data"] = analytics
@@ -1504,8 +1847,105 @@ class App(FastAPI):
             else:
                 raise HTTPException(status_code=403, detail="Invalid key.")
 
-        app.include_router(router)
+        @router.post("/process_recording", dependencies=[Depends(login_check)])
+        async def process_recording(
+            request: fastapi.Request,
+        ):
+            try:
+                content_type_header = request.headers.get("Content-Type")
+                content_type: bytes
+                content_type, _ = parse_options_header(content_type_header or "")
+                if content_type != b"multipart/form-data":
+                    raise HTTPException(status_code=400, detail="Invalid content type.")
 
+                app = request.app
+                max_file_size = (
+                    app.get_blocks().max_file_size
+                    if hasattr(app, "get_blocks")
+                    else None
+                )
+                max_file_size = max_file_size if max_file_size is not None else math.inf
+
+                multipart_parser = GradioMultiPartParser(
+                    request.headers,
+                    request.stream(),
+                    max_files=1,
+                    max_fields=10,
+                    max_file_size=max_file_size,
+                )
+                form = await multipart_parser.parse()
+            except MultiPartException as exc:
+                code = 413 if "maximum allowed size" in exc.message else 400
+                return PlainTextResponse(exc.message, status_code=code)
+
+            video_files = form.getlist("video")
+            if not video_files or not isinstance(video_files[0], GradioUploadFile):
+                raise HTTPException(status_code=400, detail="No video file provided")
+
+            video_file = video_files[0]
+
+            params = {}
+            if (
+                form.get("remove_segment_start") is not None
+                and form.get("remove_segment_end") is not None
+            ):
+                params["remove_segment_start"] = form.get("remove_segment_start")
+                params["remove_segment_end"] = form.get("remove_segment_end")
+
+            zoom_effects_json = form.get("zoom_effects")
+            if zoom_effects_json:
+                try:
+                    params["zoom_effects"] = json.loads(str(zoom_effects_json))
+                except json.JSONDecodeError:
+                    params["zoom_effects"] = []
+
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=".mp4", dir=DEFAULT_TEMP_DIR
+            ) as input_file:
+                video_file.file.seek(0)
+                shutil.copyfileobj(video_file.file, input_file)
+                input_path = input_file.name
+
+            if wasm_utils.IS_WASM or shutil.which("ffmpeg") is None:
+                return FileResponse(
+                    input_path,
+                    media_type="video/mp4",
+                    filename="gradio-screen-recording.mp4",
+                    background=BackgroundTask(lambda: cleanup_files([input_path])),
+                )
+
+            output_path = tempfile.mkstemp(
+                suffix="_processed.mp4", dir=DEFAULT_TEMP_DIR
+            )[1]
+
+            try:
+                processed_path, temp_files = await process_video_with_ffmpeg(
+                    input_path, output_path, params
+                )
+
+                return FileResponse(
+                    processed_path,
+                    media_type="video/mp4",
+                    filename="gradio-screen-recording.mp4",
+                    background=BackgroundTask(lambda: cleanup_files(temp_files)),
+                )
+            except Exception:
+                return FileResponse(
+                    input_path,
+                    media_type="video/mp4",
+                    filename="gradio-screen-recording.mp4",
+                    background=BackgroundTask(lambda: cleanup_files([input_path])),
+                )
+
+        def cleanup_files(files):
+            for file in files:
+                try:
+                    if file and os.path.exists(file):
+                        os.unlink(file)
+                except Exception as e:
+                    print(f"Error cleaning up file {file}: {str(e)}")
+
+        app.include_router(router)
         return app
 
 
@@ -1568,6 +2008,10 @@ def mount_gradio_app(
     ssr_mode: bool | None = None,
     node_server_name: str | None = None,
     node_port: int | None = None,
+    enable_monitoring: bool | None = None,
+    pwa: bool | None = None,
+    i18n: I18n | None = None,
+    mcp_server: bool | None = None,
 ) -> fastapi.FastAPI:
     """Mount a gradio.Blocks to an existing FastAPI application.
 
@@ -1590,7 +2034,9 @@ def mount_gradio_app(
         show_api: If False, hides the "Use via API" button on the Gradio interface.
         ssr_mode: If True, the Gradio app will be rendered using server-side rendering mode, which is typically more performant and provides better SEO, but this requires Node 20+ to be installed on the system. If False, the app will be rendered using client-side rendering mode. If None, will use GRADIO_SSR_MODE environment variable or default to False.
         node_server_name: The name of the Node server to use for SSR. If None, will use GRADIO_NODE_SERVER_NAME environment variable or search for a node binary in the system.
+        i18n: If provided, the i18n instance to use for this gradio app.
         node_port: The port on which the Node server should run. If None, will use GRADIO_NODE_SERVER_PORT environment variable or find a free port.
+        mcp_server: If True, the MCP server will be launched on the gradio app. If None, will use GRADIO_MCP_SERVER environment variable or default to False.
     Example:
         from fastapi import FastAPI
         import gradio as gr
@@ -1617,7 +2063,11 @@ def mount_gradio_app(
     blocks.custom_mount_path = path
     blocks.server_port = server_port
     blocks.server_name = server_name
-
+    blocks.enable_monitoring = enable_monitoring
+    if pwa is not None:
+        blocks.pwa = pwa
+    if i18n is not None:
+        blocks.i18n_instance = i18n
     if auth is not None and auth_dependency is not None:
         raise ValueError(
             "You cannot provide both `auth` and `auth_dependency` in mount_gradio_app(). Please choose one."
@@ -1655,14 +2105,13 @@ def mount_gradio_app(
         )
     )
 
-    blocks.node_path = os.environ.get(
-        "GRADIO_NODE_PATH", "" if wasm_utils.IS_WASM else get_node_path()
-    )
-
-    blocks.node_server_name = node_server_name
-    blocks.node_port = node_port
-
     if blocks.ssr_mode:
+        blocks.node_path = os.environ.get(
+            "GRADIO_NODE_PATH", "" if wasm_utils.IS_WASM else get_node_path()
+        )
+
+        blocks.node_server_name = node_server_name
+        blocks.node_port = node_port
         blocks.node_server_name, blocks.node_process, blocks.node_port = (
             start_node_server(
                 server_name=blocks.node_server_name,
@@ -1676,6 +2125,7 @@ def mount_gradio_app(
         app_kwargs=app_kwargs,
         auth_dependency=auth_dependency,
         ssr_mode=blocks.ssr_mode,
+        mcp_server=mcp_server,
     )
     old_lifespan = app.router.lifespan_context
 
@@ -1683,13 +2133,30 @@ def mount_gradio_app(
     async def new_lifespan(app: FastAPI):
         async with old_lifespan(
             app
-        ):  # Insert the startup events inside the FastAPI context manager
+        ) as state:  # Insert the startup events inside the FastAPI context manager
             async with gradio_app.router.lifespan_context(gradio_app):
                 gradio_app.get_blocks().run_startup_events()
                 await gradio_app.get_blocks().run_extra_startup_events()
-                yield
+                yield state
 
-    app.router.lifespan_context = new_lifespan
+    app.router.lifespan_context = new_lifespan  # type: ignore
 
     app.mount(path, gradio_app)
     return app
+
+
+INTERNAL_ROUTES = [
+    "theme.css",
+    "robots.txt",
+    "pwa_icon",
+    "manifest.json",
+    "login",
+    "logout",
+    "svelte",
+    "config",
+    "static",
+    "assets",
+    "favicon.ico",
+    "gradio_api",
+    "monitoring",
+]

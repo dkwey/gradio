@@ -60,17 +60,17 @@ class TestVideo:
             "value": None,
             "interactive": None,
             "proxy_url": None,
-            "mirror_webcam": True,
+            "webcam_options": {"constraints": None, "mirror": True},
             "include_audio": True,
             "format": None,
             "min_length": None,
             "max_length": None,
             "_selectable": False,
             "key": None,
+            "preserved_by_key": ["value"],
             "loop": False,
             "streaming": False,
             "watermark": None,
-            "webcam_constraints": None,
         }
         assert video_input.preprocess(None) is None
         video_input = gr.Video(format="avi")
@@ -99,10 +99,21 @@ class TestVideo:
         output_with_subtitles = output_with_subtitles.model_dump()
         assert output_with_subtitles["subtitles"]["path"].endswith(".vtt")
 
+        video = gr.Video(format="wav")
+        video_url_with_query_param = "https://github.com/gradio-app/gradio/raw/refs/heads/main/test/test_files/playable_but_bad_container.mp4?query=fake"
+        postprocessed_video_with_query_param = video.postprocess(
+            video_url_with_query_param
+        )
+        assert postprocessed_video_with_query_param
+        assert postprocessed_video_with_query_param.model_dump()["video"][
+            "path"
+        ].endswith("playable_but_bad_container.wav")
+
         p_video = gr.Video()
         video_with_subtitle = gr.Video()
         postprocessed_video = p_video.postprocess(Path(y_vid_path))
         assert postprocessed_video
+
         postprocessed_video = postprocessed_video.model_dump()
         postprocessed_video_with_subtitle = video_with_subtitle.postprocess(
             (Path(y_vid_path), Path(subtitles_path))
@@ -205,7 +216,9 @@ class TestVideo:
 
         mock_ffmpeg.reset_mock()
         _ = gr.Video(
-            sources=["webcam"], mirror_webcam=False, include_audio=True
+            sources=["webcam"],
+            webcam_options=gr.WebcamOptions(mirror=False),
+            include_audio=True,
         ).preprocess(x_video)
         mock_ffmpeg.assert_not_called()
 
@@ -217,7 +230,9 @@ class TestVideo:
 
         mock_ffmpeg.reset_mock()
         output_file = gr.Video(
-            sources=["webcam"], mirror_webcam=True, format="avi"
+            sources=["webcam"],
+            webcam_options=gr.WebcamOptions(mirror=True),
+            format="avi",
         ).preprocess(x_video)
         assert output_file
         output_params = mock_ffmpeg.call_args_list[0][1]["outputs"]
@@ -228,7 +243,10 @@ class TestVideo:
 
         mock_ffmpeg.reset_mock()
         output_file = gr.Video(
-            sources=["webcam"], mirror_webcam=False, format="avi", include_audio=False
+            sources=["webcam"],
+            webcam_options=gr.WebcamOptions(mirror=False),
+            format="avi",
+            include_audio=False,
         ).preprocess(x_video)
         assert output_file
         output_params = mock_ffmpeg.call_args_list[0][1]["outputs"]

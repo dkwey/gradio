@@ -1,5 +1,107 @@
 # @gradio/row
 
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.15
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.14
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.13
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/utils@0.10.2
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.8
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.7
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.6
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.5
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.4
+
+## 0.2.1
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.3
+- @gradio/utils@0.10.1
+
+## 0.2.1
+
+### Fixes
+
+- [#10372](https://github.com/gradio-app/gradio/pull/10372) [`96bbde2`](https://github.com/gradio-app/gradio/commit/96bbde277e059f79bb2c9898576050e84dab147a) - Allow propogation of fill_height through Rows and Tabs, via scale.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.2
+
 ## 0.2.0
 
 ### Dependency updates

@@ -1,5 +1,127 @@
 # @gradio/tabitem
 
+## 0.5.0
+
+### Dependency updates
+
+- @gradio/column@0.2.1
+
+## 0.5.0
+
+### Features
+
+- [#11427](https://github.com/gradio-app/gradio/pull/11427) [`6b2bcd0`](https://github.com/gradio-app/gradio/commit/6b2bcd097ae5ef999a7fb273ecf7c7e4c0eab305) - Improve load times of the Gradio front-end.  Thanks @pngwn!
+
+### Dependency updates
+
+- @gradio/column@0.2.1
+- @gradio/tabs@0.4.5
+
+## 0.4.6
+
+### Dependency updates
+
+- @gradio/column@0.2.1
+
+## 0.4.5
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.5
+
+### Dependency updates
+
+- @gradio/tabs@0.4.5
+
+## 0.4.5
+
+### Dependency updates
+
+- @gradio/tabs@0.4.5
+
+## 0.4.4
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.4
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.4
+
+### Dependency updates
+
+- @gradio/tabs@0.4.4
+
+## 0.4.3
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.3
+
+### Dependency updates
+
+- @gradio/tabs@0.4.3
+- @gradio/utils@0.10.2
+- @gradio/column@0.2.0
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/column@0.2.0
+
+## 0.4.2
+
+### Dependency updates
+
+- @gradio/tabs@0.4.2
+- @gradio/utils@0.10.1
+- @gradio/column@0.2.0
+
+## 0.4.1
+
+### Fixes
+
+- [#10372](https://github.com/gradio-app/gradio/pull/10372) [`96bbde2`](https://github.com/gradio-app/gradio/commit/96bbde277e059f79bb2c9898576050e84dab147a) - Allow propogation of fill_height through Rows and Tabs, via scale.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/tabs@0.4.1
+- @gradio/column@0.2.0
+
 ## 0.4.0
 
 ### Dependency updates

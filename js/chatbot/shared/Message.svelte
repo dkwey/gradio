@@ -31,7 +31,6 @@
 	export let line_breaks: boolean;
 	export let upload: Client["upload"];
 	export let target: HTMLElement | null;
-	export let root: string;
 	export let theme_mode: "light" | "dark" | "system";
 	export let _components: Record<string, ComponentType<SvelteComponent>>;
 	export let i: number;
@@ -47,19 +46,24 @@
 	export let scroll: () => void;
 	export let allow_file_downloads: boolean;
 	export let in_edit_mode: boolean;
-	export let edit_message: string;
+	export let edit_messages: string[];
 	export let display_consecutive_in_same_bubble: boolean;
 	export let current_feedback: string | null = null;
+	export let allow_tags: string[] | boolean = false;
+	export let watermark: string | null = null;
 	let messageElements: HTMLDivElement[] = [];
 	let previous_edit_mode = false;
-	let last_message_width = 0;
-	let last_message_height = 0;
+	let message_widths: number[] = Array(messages.length).fill(160);
+	let message_heights: number[] = Array(messages.length).fill(0);
 
 	$: if (in_edit_mode && !previous_edit_mode) {
-		last_message_width =
-			messageElements[messageElements.length - 1]?.clientWidth;
-		last_message_height =
-			messageElements[messageElements.length - 1]?.clientHeight;
+		const offset = messageElements.length - messages.length;
+		for (let idx = offset; idx < messageElements.length; idx++) {
+			if (idx >= 0) {
+				message_widths[idx - offset] = messageElements[idx]?.clientWidth;
+				message_heights[idx - offset] = messageElements[idx]?.clientHeight;
+			}
+		}
 	}
 
 	function handle_select(i: number, message: NormalisedMessage): void {
@@ -103,6 +107,7 @@
 		avatar: FileData | null;
 		dispatch: any;
 		current_feedback: string | null;
+		watermark: string | null;
 	};
 
 	let button_panel_props: ButtonPanelProps;
@@ -121,7 +126,8 @@
 		avatar: avatar_img,
 		layout,
 		dispatch,
-		current_feedback
+		current_feedback,
+		watermark
 	};
 </script>
 
@@ -154,14 +160,14 @@
 						message.content.component === "html"}
 					class:thought={thought_index > 0}
 				>
-					{#if in_edit_mode && thought_index === messages.length - 1 && message.type === "text"}
+					{#if in_edit_mode && message.type === "text"}
 						<!-- svelte-ignore a11y-autofocus -->
 						<textarea
 							class="edit-textarea"
-							style:width={`max(${last_message_width}px, 160px)`}
-							style:min-height={`${last_message_height}px`}
+							style:width={`max(${message_widths[thought_index]}px, 160px)`}
+							style:min-height={`${message_heights[thought_index]}px`}
 							autofocus
-							bind:value={edit_message}
+							bind:value={edit_messages[thought_index]}
 						/>
 					{:else}
 						<!-- svelte-ignore a11y-no-static-element-interactions -->
@@ -190,13 +196,13 @@
 									thought={message}
 									{rtl}
 									{sanitize_html}
+									{allow_tags}
 									{latex_delimiters}
 									{render_markdown}
 									{_components}
 									{upload}
 									{thought_index}
 									{target}
-									{root}
 									{theme_mode}
 									{_fetch}
 									{scroll}
@@ -209,13 +215,13 @@
 								<MessageContent
 									{message}
 									{sanitize_html}
+									{allow_tags}
 									{latex_delimiters}
 									{render_markdown}
 									{_components}
 									{upload}
 									{thought_index}
 									{target}
-									{root}
 									{theme_mode}
 									{_fetch}
 									{scroll}
@@ -233,7 +239,9 @@
 					<ButtonPanel
 						{...button_panel_props}
 						{current_feedback}
+						{watermark}
 						on:copy={(e) => dispatch("copy", e.detail)}
+						{i18n}
 					/>
 				{/if}
 			{/each}
@@ -242,13 +250,18 @@
 </div>
 
 {#if layout === "bubble"}
-	<ButtonPanel {...button_panel_props} />
+	<ButtonPanel {...button_panel_props} {i18n} />
 {/if}
 
 <style>
 	.message {
 		position: relative;
 		width: 100%;
+		margin-top: var(--spacing-sm);
+	}
+
+	.message.display_consecutive_in_same_bubble {
+		margin-top: 0;
 	}
 
 	/* avatar styles */
@@ -285,6 +298,12 @@
 
 	.component.gallery {
 		border: none;
+	}
+
+	.bot:has(.model3D),
+	.user:has(.model3D) {
+		border: none;
+		max-width: 75%;
 	}
 
 	.message-row :not(.avatar-container) :global(img) {
@@ -489,7 +508,7 @@
 		height: 100%;
 		object-fit: cover;
 		border-radius: 50%;
-		padding: 6px;
+		padding: var(--size-1-5);
 	}
 
 	.selectable {

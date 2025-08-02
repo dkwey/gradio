@@ -415,3 +415,49 @@ class TestExampleMessages:
         chat = gr.ChatInterface(double, api_name="double")
         with connect(chat) as client:
             assert "/double" in client.view_api(return_format="dict")["named_endpoints"]
+
+    def test_chat_interface_api_names_with_additional_inputs(self, connect):
+        def response(message, history, random_number: int):
+            return str(random_number)
+
+        chat = gr.ChatInterface(
+            response, additional_inputs=[gr.Textbox(label="Random number")]
+        )
+        with connect(chat) as client:
+            endpoints = client.view_api(return_format="dict")["named_endpoints"]
+            assert "/chat" in endpoints
+            assert any(
+                p["parameter_name"] == "random_number"
+                for p in endpoints["/chat"]["parameters"]
+            )
+
+    def test_example_icons_set_if_multimodal_false(self):
+        demo = gr.ChatInterface(
+            fn=double,
+            type="messages",
+            title="🌤️ Weather Assistant",
+            description="Ask about the weather anywhere! Watch as I gather the information step by step.",
+            examples=[
+                "What's the weather like in Tokyo?",
+                "Is it sunny in Paris right now?",
+                "Should I bring an umbrella in New York today?",
+            ],
+            example_icons=[
+                "https://cdn3.iconfinder.com/data/icons/landmark-outline/432/japan_tower_tokyo_landmark_travel_architecture_tourism_view-256.png",
+                "https://cdn2.iconfinder.com/data/icons/city-building-1/200/ArcdeTriomphe-256.png",
+                "https://cdn2.iconfinder.com/data/icons/city-icons-for-offscreen-magazine/80/new-york-256.png",
+            ],
+        )
+        assert len(demo.examples_messages) == 3
+        assert (
+            demo.examples_messages[0].get("icon", {}).get("url")  # type: ignore
+            == "https://cdn3.iconfinder.com/data/icons/landmark-outline/432/japan_tower_tokyo_landmark_travel_architecture_tourism_view-256.png"
+        )
+        assert (
+            demo.examples_messages[1].get("icon", {}).get("url")  # type: ignore
+            == "https://cdn2.iconfinder.com/data/icons/city-building-1/200/ArcdeTriomphe-256.png"
+        )
+        assert (
+            demo.examples_messages[2].get("icon", {}).get("url")  # type: ignore
+            == "https://cdn2.iconfinder.com/data/icons/city-icons-for-offscreen-magazine/80/new-york-256.png"
+        )

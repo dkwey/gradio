@@ -27,14 +27,13 @@ keywords = ["machine learning", "reproducibility", "visualization"]
 
 classifiers = [
   'Development Status :: 5 - Production/Stable',
-  'License :: OSI Approved :: Apache Software License',
   'Operating System :: OS Independent',
   'Programming Language :: Python :: 3',
   'Programming Language :: Python :: 3 :: Only',
-  'Programming Language :: Python :: 3.8',
-  'Programming Language :: Python :: 3.9',
   'Programming Language :: Python :: 3.10',
   'Programming Language :: Python :: 3.11',
+  'Programming Language :: Python :: 3.12',
+  'Programming Language :: Python :: 3.13',
   'Topic :: Scientific/Engineering',
   'Topic :: Scientific/Engineering :: Artificial Intelligence',
   'Topic :: Scientific/Engineering :: Visualization',
@@ -56,6 +55,7 @@ filename = "requirements.txt"
 
 [tool.hatch.metadata.hooks.requirements_txt.optional-dependencies]
 oauth = ["requirements-oauth.txt"]
+mcp = ["requirements-mcp.txt"]
 
 [tool.hatch.metadata.hooks.fancy-pypi-readme]
 content-type = "text/markdown"
@@ -82,6 +82,9 @@ artifacts = [
 artifacts = ["!gradio/templates", "!*.pyi", "!/gradio/test_data", "!/gradio/_frontend_code", "!/gradio/node"]
 directory = "dist-lite"
 dependencies = ["lite-builder @ {root:uri}/../.config/lite-builder"]
+
+[tool.hatch.build.targets.lite.hooks.custom]
+path = ".config/pycompile-lite-wheel.py"
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 path = ".config/copy_frontend.py"
@@ -145,6 +148,7 @@ ignore = [
   "PLR2004", # magic numbers
   "PLW2901", # `for` loop variable overwritten by assignment target
   "SIM105",  # contextlib.suppress (has a performance cost)
+  "SIM115",  # contextlib.suppress (has a performance cost)
   "SIM117",  # multiple nested with blocks (doesn't look good with gr.Row etc)
   "UP006",   # use `list` instead of `List` for type annotations (fails for 3.8)
   "UP007",   # use X | Y for type annotations (TODO: can be enabled once Pydantic plays nice with them)

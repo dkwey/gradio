@@ -1,5 +1,297 @@
 # @gradio/gallery
 
+## 0.15.28
+
+### Dependency updates
+
+- @gradio/upload@0.16.12
+- @gradio/video@0.14.22
+- @gradio/client@1.15.7
+- @gradio/image@0.22.14
+- @gradio/file@0.12.25
+
+## 0.15.27
+
+### Dependency updates
+
+- @gradio/video@0.14.21
+- @gradio/client@1.15.6
+- @gradio/statustracker@0.10.15
+- @gradio/upload@0.16.11
+- @gradio/image@0.22.13
+- @gradio/file@0.12.24
+
+## 0.15.26
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+- @gradio/statustracker@0.10.14
+- @gradio/upload@0.16.10
+- @gradio/video@0.14.20
+- @gradio/client@1.15.5
+- @gradio/image@0.22.12
+- @gradio/file@0.12.23
+
+## 0.15.25
+
+### Dependency updates
+
+- @gradio/upload@0.16.9
+- @gradio/video@0.14.19
+- @gradio/client@1.15.4
+- @gradio/image@0.22.11
+- @gradio/file@0.12.22
+
+## 0.15.24
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.13
+- @gradio/video@0.14.18
+- @gradio/atoms@0.16.2
+- @gradio/client@1.15.3
+- @gradio/upload@0.16.8
+- @gradio/image@0.22.10
+- @gradio/file@0.12.21
+
+## 0.15.23
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+
+## 0.15.23
+
+### Fixes
+
+- [#11362](https://github.com/gradio-app/gradio/pull/11362) [`1b88339`](https://github.com/gradio-app/gradio/commit/1b883395eb3feceed60ec79fcf19285269e2b171) - Fix Gallery thumbnail overflow.  Thanks @freddyaboulton!
+
+## 0.15.22
+
+### Dependency updates
+
+- @gradio/upload@0.16.7
+- @gradio/video@0.14.17
+- @gradio/client@1.15.2
+- @gradio/file@0.12.20
+- @gradio/image@0.22.9
+
+## 0.15.21
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+- @gradio/video@0.14.16
+- @gradio/image@0.22.8
+- @gradio/file@0.12.19
+
+## 0.15.20
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.12
+- @gradio/client@1.15.1
+- @gradio/upload@0.16.6
+- @gradio/image@0.22.7
+- @gradio/file@0.12.19
+- @gradio/video@0.14.15
+
+## 0.15.19
+
+### Features
+
+- [#11177](https://github.com/gradio-app/gradio/pull/11177) [`3068196`](https://github.com/gradio-app/gradio/commit/3068196d47234fd1c1634f33b9ddfc089f5cbbe0) - Improved, smoother fullscreen mode for components.  Thanks @aliabid94!
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.11
+- @gradio/atoms@0.16.1
+- @gradio/client@1.15.0
+- @gradio/upload@0.16.5
+- @gradio/image@0.22.6
+- @gradio/video@0.14.14
+- @gradio/file@0.12.18
+
+## 0.15.18
+
+### Dependency updates
+
+- @gradio/video@0.14.13
+- @gradio/upload@0.16.4
+- @gradio/image@0.22.5
+- @gradio/file@0.12.17
+
+## 0.15.17
+
+### Dependency updates
+
+- @gradio/video@0.14.12
+- @gradio/image@0.22.4
+
+## 0.15.16
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.10
+- @gradio/image@0.22.3
+- @gradio/upload@0.16.3
+- @gradio/video@0.14.11
+- @gradio/atoms@0.16.0
+- @gradio/file@0.12.16
+
+## 0.15.15
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.9
+- @gradio/video@0.14.10
+- @gradio/atoms@0.15.2
+- @gradio/client@1.14.2
+- @gradio/utils@0.10.2
+- @gradio/upload@0.16.2
+- @gradio/image@0.22.2
+- @gradio/file@0.12.15
+
+## 0.15.14
+
+### Dependency updates
+
+- @gradio/upload@0.16.1
+- @gradio/atoms@0.15.1
+- @gradio/statustracker@0.10.8
+- @gradio/icons@0.12.0
+- @gradio/image@0.22.1
+- @gradio/video@0.14.9
+- @gradio/file@0.12.14
+
+## 0.15.13
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.7
+- @gradio/video@0.14.8
+- @gradio/atoms@0.15.0
+- @gradio/icons@0.11.0
+- @gradio/upload@0.16.0
+- @gradio/image@0.22.0
+- @gradio/file@0.12.13
+
+## 0.15.12
+
+### Dependency updates
+
+- @gradio/video@0.14.7
+- @gradio/client@1.14.1
+- @gradio/upload@0.15.7
+- @gradio/image@0.21.7
+- @gradio/file@0.12.12
+
+## 0.15.11
+
+### Dependency updates
+
+- @gradio/video@0.14.6
+- @gradio/atoms@0.14.1
+- @gradio/statustracker@0.10.6
+- @gradio/client@1.14.0
+- @gradio/upload@0.15.6
+- @gradio/image@0.21.6
+- @gradio/file@0.12.11
+
+## 0.15.10
+
+### Dependency updates
+
+- @gradio/image@0.21.5
+- @gradio/upload@0.15.5
+- @gradio/statustracker@0.10.5
+- @gradio/video@0.14.5
+- @gradio/atoms@0.14.0
+- @gradio/file@0.12.10
+
+## 0.15.9
+
+### Dependency updates
+
+- @gradio/video@0.14.4
+- @gradio/client@1.13.1
+- @gradio/upload@0.15.4
+- @gradio/image@0.21.4
+- @gradio/file@0.12.9
+
+## 0.15.8
+
+### Dependency updates
+
+- @gradio/upload@0.15.3
+- @gradio/video@0.14.3
+- @gradio/client@1.13.0
+- @gradio/image@0.21.3
+- @gradio/file@0.12.8
+
+## 0.15.7
+
+### Dependency updates
+
+- @gradio/image@0.21.2
+- @gradio/upload@0.15.2
+- @gradio/statustracker@0.10.4
+- @gradio/video@0.14.2
+- @gradio/atoms@0.13.3
+- @gradio/file@0.12.7
+
+## 0.15.6
+
+### Dependency updates
+
+- @gradio/statustracker@0.10.3
+- @gradio/video@0.14.1
+- @gradio/atoms@0.13.2
+- @gradio/utils@0.10.1
+- @gradio/client@1.12.0
+- @gradio/upload@0.15.1
+- @gradio/image@0.21.1
+- @gradio/file@0.12.6
+
+## 0.15.5
+
+### Dependency updates
+
+- @gradio/client@1.11.0
+- @gradio/upload@0.15.0
+- @gradio/image@0.21.0
+- @gradio/file@0.12.5
+- @gradio/video@0.14.0
+
+## 0.15.4
+
+### Dependency updates
+
+- @gradio/upload@0.14.8
+- @gradio/file@0.12.4
+- @gradio/image@0.20.4
+- @gradio/video@0.13.4
+
+## 0.15.3
+
+### Dependency updates
+
+- @gradio/upload@0.14.7
+- @gradio/file@0.12.3
+- @gradio/image@0.20.3
+- @gradio/video@0.13.3
+
+## 0.15.2
+
+### Dependency updates
+
+- @gradio/upload@0.14.6
+- @gradio/video@0.13.2
+- @gradio/statustracker@0.10.2
+- @gradio/image@0.20.2
+- @gradio/file@0.12.2
+
 ## 0.15.1
 
 ### Dependency updates

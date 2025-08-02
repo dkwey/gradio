@@ -2,13 +2,13 @@
 	import { tick, onMount } from "svelte";
 	import { _ } from "svelte-i18n";
 	import { Client } from "@gradio/client";
+	import { writable } from "svelte/store";
 
 	import type { LoadingStatus, LoadingStatusCollection } from "./stores";
 
 	import type { ComponentMeta, Dependency, LayoutNode } from "./types";
 	import type { UpdateTransaction } from "./init";
 	import { setupi18n } from "./i18n";
-	import { ApiDocs, ApiRecorder, Settings } from "./api_docs/";
 	import type { ThemeMode, Payload } from "./types";
 	import { Toast } from "@gradio/statustracker";
 	import type { ToastMessage } from "@gradio/statustracker";
@@ -16,17 +16,22 @@
 	import MountComponents from "./MountComponents.svelte";
 	import { prefix_css } from "./css";
 
+	import type ApiDocs from "./api_docs/ApiDocs.svelte";
+	import type ApiRecorder from "./api_docs/ApiRecorder.svelte";
+	import type Settings from "./api_docs/Settings.svelte";
+	import type { ComponentType } from "svelte";
+
 	import logo from "./images/logo.svg";
 	import api_logo from "./api_docs/img/api-logo.svg";
 	import settings_logo from "./api_docs/img/settings-logo.svg";
+	import record_stop from "./api_docs/img/record-stop.svg";
 	import { create_components, AsyncFunction } from "./init";
 	import type {
 		LogMessage,
 		RenderMessage,
 		StatusMessage
 	} from "@gradio/client";
-
-	setupi18n();
+	import * as screen_recorder from "./screen_recorder";
 
 	export let root: string;
 	export let components: ComponentMeta[];
@@ -51,6 +56,8 @@
 	export let max_file_size: number | undefined = undefined;
 	export let initial_layout: ComponentMeta | undefined = undefined;
 	export let css: string | null | undefined = null;
+	let broken_connection = false;
+
 	let {
 		layout: _layout,
 		targets,
@@ -62,8 +69,11 @@
 		loading_status,
 		scheduled_updates,
 		create_layout,
-		rerender_layout
-	} = create_components(initial_layout);
+		rerender_layout,
+		value_change
+	} = create_components({
+		initial_layout
+	});
 
 	$: components, layout, dependencies, root, app, fill_height, target, run();
 
@@ -71,7 +81,21 @@
 		ready = !!$_layout;
 	}
 
+	let old_dependencies = dependencies;
+	$: if (
+		dependencies !== old_dependencies &&
+		render_complete &&
+		!layout_creating
+	) {
+		// re-run load triggers in SSR mode when page changes
+		handle_load_triggers();
+		old_dependencies = dependencies;
+	}
+
 	async function run(): Promise<void> {
+		await setupi18n(app.config?.i18n_translations || undefined);
+
+		layout_creating = true;
 		await create_layout({
 			components,
 			layout,
@@ -82,6 +106,7 @@
 				fill_height
 			}
 		});
+		layout_creating = false;
 	}
 
 	export let search_params: URLSearchParams;
@@ -89,9 +114,42 @@
 	let settings_visible = search_params.get("view") === "settings";
 	let api_recorder_visible =
 		search_params.get("view") === "api-recorder" && show_api;
+	let allow_zoom = true;
+	let allow_video_trim = true;
 
-	function set_api_docs_visible(visible: boolean): void {
+	// Lazy component loading state
+	let ApiDocs: ComponentType<ApiDocs> | null = null;
+	let ApiRecorder: ComponentType<ApiRecorder> | null = null;
+	let Settings: ComponentType<Settings> | null = null;
+
+	async function loadApiDocs(): Promise<void> {
+		if (!ApiDocs || !ApiRecorder) {
+			const api_docs_module = await import("./api_docs/ApiDocs.svelte");
+			const api_recorder_module = await import("./api_docs/ApiRecorder.svelte");
+			if (!ApiDocs) ApiDocs = api_docs_module.default;
+			if (!ApiRecorder) ApiRecorder = api_recorder_module.default;
+		}
+	}
+
+	async function loadApiRecorder(): Promise<void> {
+		if (!ApiRecorder) {
+			const api_recorder_module = await import("./api_docs/ApiRecorder.svelte");
+			ApiRecorder = api_recorder_module.default;
+		}
+	}
+
+	async function loadSettings(): Promise<void> {
+		if (!Settings) {
+			const settings_module = await import("./api_docs/Settings.svelte");
+			Settings = settings_module.default;
+		}
+	}
+
+	async function set_api_docs_visible(visible: boolean): Promise<void> {
 		api_recorder_visible = false;
+		if (visible) {
+			await loadApiDocs();
+		}
 		api_docs_visible = visible;
 		let params = new URLSearchParams(window.location.search);
 		if (visible) {
@@ -102,7 +160,10 @@
 		history.replaceState(null, "", "?" + params.toString());
 	}
 
-	function set_settings_visible(visible: boolean): void {
+	async function set_settings_visible(visible: boolean): Promise<void> {
+		if (visible) {
+			await loadSettings();
+		}
 		let params = new URLSearchParams(window.location.search);
 		if (visible) {
 			params.set("view", "settings");
@@ -115,10 +176,33 @@
 
 	let api_calls: Payload[] = [];
 
+	let layout_creating = false;
 	export let render_complete = false;
-	async function handle_update(data: any, fn_index: number): Promise<void> {
-		const outputs = dependencies.find((dep) => dep.id == fn_index)!.outputs;
 
+	async function handle_update(data: any, fn_index: number): Promise<void> {
+		const dep = dependencies.find((dep) => dep.id === fn_index);
+		const input_type = components.find(
+			(comp) => comp.id === dep?.inputs[0]
+		)?.type;
+		if (allow_zoom && dep && input_type !== "dataset") {
+			if (dep && dep.inputs && dep.inputs.length > 0 && $is_screen_recording) {
+				screen_recorder.zoom(true, dep.inputs, 1.0);
+			}
+
+			if (
+				dep &&
+				dep.outputs &&
+				dep.outputs.length > 0 &&
+				$is_screen_recording
+			) {
+				screen_recorder.zoom(false, dep.outputs, 2.0);
+			}
+		}
+
+		if (!dep) {
+			return;
+		}
+		const outputs = dep.outputs;
 		const meta_updates = data?.map((value: any, i: number) => {
 			return {
 				id: outputs[i],
@@ -195,13 +279,17 @@
 
 	let _error_id = -1;
 
-	let user_left_page = false;
-
 	const MESSAGE_QUOTE_RE = /^'([^]+)'$/;
 
 	const DUPLICATE_MESSAGE = $_("blocks.long_requests_queue");
 	const MOBILE_QUEUE_WARNING = $_("blocks.connection_can_break");
-	const MOBILE_RECONNECT_MESSAGE = $_("blocks.lost_connection");
+	const LOST_CONNECTION_MESSAGE =
+		"Connection to the server was lost. Attempting reconnection...";
+	const CHANGED_CONNECTION_MESSAGE =
+		"Reconnected to server, but the server has changed. You may need to <a href=''>refresh the page</a>.";
+	const RECONNECTION_MESSAGE = "Connection re-established.";
+	const SESSION_NOT_FOUND_MESSAGE =
+		"Session not found - this is likely because the machine you were connected to has changed. <a href=''>Refresh the page</a> to continue.";
 	const WAITING_FOR_INPUTS_MESSAGE = $_("blocks.waiting_for_inputs");
 	const SHOW_DUPLICATE_MESSAGE_ON_ETA = 15;
 	const SHOW_MOBILE_QUEUE_WARNING_ON_ETA = 10;
@@ -255,7 +343,11 @@
 		trigger_id: number | null = null,
 		event_data: unknown = null
 	): Promise<void> {
-		let dep = dependencies.find((dep) => dep.id === dep_index)!;
+		const _dep = dependencies.find((dep) => dep.id === dep_index);
+		if (_dep === undefined) {
+			return;
+		}
+		const dep = _dep;
 		if (inputs_waiting.length > 0) {
 			for (const input of inputs_waiting) {
 				if (dep.inputs.includes(input)) {
@@ -281,7 +373,7 @@
 			trigger_id: trigger_id
 		};
 
-		if (dep.frontend_fn) {
+		if (dep.frontend_fn && typeof dep.frontend_fn !== "boolean") {
 			dep
 				.frontend_fn(
 					payload.data.concat(
@@ -306,6 +398,21 @@
 			);
 		} else {
 			if (dep.backend_fn) {
+				if (dep.js_implementation) {
+					let js_fn = new AsyncFunction(
+						`let result = await (${dep.js_implementation})(...arguments);
+						return (!Array.isArray(result)) ? [result] : result;`
+					);
+					js_fn(...payload.data)
+						.then((js_result) => {
+							handle_update(js_result, dep_index);
+							payload.js_implementation = true;
+						})
+						.catch((error) => {
+							console.error(error);
+							payload.js_implementation = false;
+						});
+				}
 				trigger_prediction(dep, payload);
 			}
 		}
@@ -325,10 +432,50 @@
 			}
 		}
 
+		async function reconnect(): Promise<void> {
+			const connection_status = await app.reconnect();
+			if (connection_status === "broken") {
+				setTimeout(reconnect, 1000);
+			} else if (connection_status === "changed") {
+				broken_connection = false;
+				messages = [
+					new_message(
+						"Changed Connection",
+						CHANGED_CONNECTION_MESSAGE,
+						-1,
+						"info",
+						3,
+						true
+					),
+					...messages.map((m) =>
+						m.message === LOST_CONNECTION_MESSAGE ? { ...m, visible: false } : m
+					)
+				];
+			} else if (connection_status === "connected") {
+				broken_connection = false;
+				messages = [
+					new_message(
+						"Reconnected",
+						RECONNECTION_MESSAGE,
+						-1,
+						"success",
+						null,
+						true
+					),
+					...messages.map((m) =>
+						m.message === LOST_CONNECTION_MESSAGE ? { ...m, visible: false } : m
+					)
+				];
+			}
+		}
+
 		async function make_prediction(
 			payload: Payload,
 			streaming = false
 		): Promise<void> {
+			if (allow_video_trim) {
+				screen_recorder.markRemoveSegmentStart();
+			}
 			if (api_recorder_visible) {
 				api_calls = [...api_calls, JSON.parse(JSON.stringify(payload))];
 			}
@@ -364,6 +511,7 @@
 				);
 			} catch (e) {
 				const fn_index = 0; // Mock value for fn_index
+				if (app.closed) return; // when a user navigates away in multipage app.
 				messages = [
 					new_message("Error", String(e), fn_index, "error"),
 					...messages
@@ -382,6 +530,9 @@
 			submit_map.set(dep_index, submission);
 
 			for await (const message of submission) {
+				if (payload.js_implementation) {
+					return;
+				}
 				if (message.type === "data") {
 					handle_data(message);
 				} else if (message.type === "render") {
@@ -412,8 +563,8 @@
 				let render_id = data.render_id;
 
 				let deps_to_remove: number[] = [];
-				dependencies.forEach((dep, i) => {
-					if (dep.rendered_in === render_id) {
+				dependencies.forEach((old_dep, i) => {
+					if (old_dep.rendered_in === dep.render_id) {
 						deps_to_remove.push(i);
 					}
 				});
@@ -430,6 +581,11 @@
 					root: root + api_prefix,
 					dependencies: dependencies,
 					render_id: render_id
+				});
+				_dependencies.forEach((dep) => {
+					if (dep.targets.some((dep) => dep[1] === "load")) {
+						wait_then_trigger_api_call(dep.id);
+					}
 				});
 			}
 
@@ -456,6 +612,35 @@
 
 			/* eslint-disable complexity */
 			function handle_status_update(message: StatusMessage): void {
+				if (message.broken && !broken_connection) {
+					messages = [
+						new_message(
+							"Broken Connection",
+							LOST_CONNECTION_MESSAGE,
+							-1,
+							"error",
+							null,
+							true
+						),
+						...messages
+					];
+
+					broken_connection = true;
+					setTimeout(reconnect, 1000);
+				}
+				if (message.session_not_found) {
+					messages = [
+						new_message(
+							"Session Not Found",
+							SESSION_NOT_FOUND_MESSAGE,
+							-1,
+							"error",
+							null,
+							true
+						),
+						...messages
+					];
+				}
 				const { fn_index, ...status } = message;
 				if (status.stage === "streaming" && status.time_limit) {
 					dep.inputs.forEach((id) => {
@@ -502,12 +687,16 @@
 				}
 
 				if (status.stage === "complete" || status.stage === "generating") {
+					const deps_triggered_by_state: Set<Dependency> = new Set();
 					status.changed_state_ids?.forEach((id) => {
 						dependencies
 							.filter((dep) => dep.targets.some(([_id, _]) => _id === id))
 							.forEach((dep) => {
-								wait_then_trigger_api_call(dep.id, payload.trigger_id);
+								deps_triggered_by_state.add(dep);
 							});
+					});
+					deps_triggered_by_state.forEach((dep) => {
+						wait_then_trigger_api_call(dep.id, payload.trigger_id);
 					});
 				}
 				if (status.stage === "complete") {
@@ -521,16 +710,11 @@
 					});
 					submit_map.delete(dep_index);
 				}
-				if (status.broken && is_mobile_device && user_left_page) {
-					window.setTimeout(() => {
-						messages = [
-							new_message("Error", MOBILE_RECONNECT_MESSAGE, fn_index, "error"),
-							...messages
-						];
-					}, 0);
-					wait_then_trigger_api_call(dep.id, payload.trigger_id, event_data);
-					user_left_page = false;
-				} else if (status.stage === "error") {
+				if (
+					status.stage === "error" &&
+					!broken_connection &&
+					!message.session_not_found
+				) {
 					if (status.message) {
 						const _message = status.message.replace(
 							MESSAGE_QUOTE_RE,
@@ -558,6 +742,9 @@
 						}
 					});
 				}
+			}
+			if (allow_video_trim) {
+				screen_recorder.markRemoveSegmentEnd();
 			}
 		}
 	}
@@ -606,13 +793,7 @@
 			if (is_external_url(_link) && _target !== "_blank")
 				a[i].setAttribute("target", "_blank");
 		}
-
-		// handle load triggers
-		dependencies.forEach((dep) => {
-			if (dep.targets.some((dep) => dep[1] === "load")) {
-				wait_then_trigger_api_call(dep.id);
-			}
-		});
+		handle_load_triggers();
 
 		if (!target || render_complete) return;
 
@@ -639,6 +820,8 @@
 				messages = [new_message("Error", data, -1, event), ...messages];
 			} else if (event === "warning") {
 				messages = [new_message("Warning", data, -1, event), ...messages];
+			} else if (event === "info") {
+				messages = [new_message("Info", data, -1, event), ...messages];
 			} else if (event == "clear_status") {
 				update_status(id, "complete", data);
 			} else if (event == "close_stream") {
@@ -665,6 +848,24 @@
 		render_complete = true;
 	}
 
+	value_change((id, value) => {
+		const deps = $targets[id]?.["change"];
+
+		deps?.forEach((dep_id) => {
+			requestAnimationFrame(() => {
+				wait_then_trigger_api_call(dep_id, id, value);
+			});
+		});
+	});
+
+	const handle_load_triggers = (): void => {
+		dependencies.forEach((dep) => {
+			if (dep.targets.some((dep) => dep[1] === "load")) {
+				wait_then_trigger_api_call(dep.id);
+			}
+		});
+	};
+
 	$: set_status($loading_status);
 
 	function update_status(
@@ -689,6 +890,10 @@
 			value: LoadingStatus;
 		}[] = [];
 		Object.entries(statuses).forEach(([id, loading_status]) => {
+			if (app.closed && loading_status.status === "error") {
+				// when a user navigates away in multipage app.
+				return;
+			}
 			let dependency = dependencies.find(
 				(dep) => dep.id == loading_status.fn_index
 			);
@@ -722,18 +927,43 @@
 		return "detail" in event;
 	}
 
-	onMount(() => {
-		document.addEventListener("visibilitychange", function () {
-			if (document.visibilityState === "hidden") {
-				user_left_page = true;
-			}
-		});
+	let is_screen_recording = writable(false);
 
+	onMount(() => {
 		is_mobile_device =
 			/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
 				navigator.userAgent
 			);
+
+		screen_recorder.initialize(
+			root,
+			(title, message, type) => {
+				add_new_message(title, message, type);
+			},
+			(isRecording) => {
+				$is_screen_recording = isRecording;
+			}
+		);
+
+		// Load components if they should be visible on initial page load
+		if (api_docs_visible) {
+			loadApiDocs();
+		}
+		if (api_recorder_visible) {
+			loadApiRecorder();
+		}
+		if (settings_visible) {
+			loadSettings();
+		}
 	});
+
+	function screen_recording(): void {
+		if ($is_screen_recording) {
+			screen_recorder.stopRecording();
+		} else {
+			screen_recorder.startRecording();
+		}
+	}
 </script>
 
 <svelte:head>
@@ -769,12 +999,20 @@
 					on:click={() => {
 						set_api_docs_visible(!api_docs_visible);
 					}}
+					on:mouseenter={() => {
+						loadApiDocs();
+						loadApiRecorder();
+					}}
 					class="show-api"
 				>
-					{$_("errors.use_via_api")}
+					{#if app.config?.mcp_server}
+						{$_("errors.use_via_api_or_mcp")}
+					{:else}
+						{$_("errors.use_via_api")}
+					{/if}
 					<img src={api_logo} alt={$_("common.logo")} />
-					<div>&nbsp;·</div>
 				</button>
+				<div class="divider show-api-divider">·</div>
 			{/if}
 			<a
 				href="https://gradio.app"
@@ -785,13 +1023,27 @@
 				{$_("common.built_with_gradio")}
 				<img src={logo} alt={$_("common.logo")} />
 			</a>
+			<div class="divider" class:hidden={!$is_screen_recording}>·</div>
+			<button
+				class:hidden={!$is_screen_recording}
+				on:click={() => {
+					screen_recording();
+				}}
+				class="record"
+			>
+				{$_("common.stop_recording")}
+				<img src={record_stop} alt={$_("common.stop_recording")} />
+			</button>
+			<div class="divider">·</div>
 			<button
 				on:click={() => {
 					set_settings_visible(!settings_visible);
 				}}
+				on:mouseenter={() => {
+					loadSettings();
+				}}
 				class="settings"
 			>
-				<div>· &nbsp;</div>
 				{$_("common.settings")}
 				<img src={settings_logo} alt={$_("common.settings")} />
 			</button>
@@ -799,7 +1051,7 @@
 	{/if}
 </div>
 
-{#if api_recorder_visible}
+{#if api_recorder_visible && ApiRecorder}
 	<!-- TODO: fix -->
 	<!-- svelte-ignore a11y-click-events-have-key-events-->
 	<!-- svelte-ignore a11y-no-static-element-interactions-->
@@ -810,11 +1062,11 @@
 			api_recorder_visible = false;
 		}}
 	>
-		<ApiRecorder {api_calls} {dependencies} />
+		<svelte:component this={ApiRecorder} {api_calls} {dependencies} />
 	</div>
 {/if}
 
-{#if api_docs_visible && $_layout}
+{#if api_docs_visible && $_layout && ApiDocs}
 	<div class="api-docs">
 		<!-- TODO: fix -->
 		<!-- svelte-ignore a11y-click-events-have-key-events-->
@@ -826,12 +1078,14 @@
 			}}
 		/>
 		<div class="api-docs-wrap">
-			<ApiDocs
+			<svelte:component
+				this={ApiDocs}
 				root_node={$_layout}
 				on:close={(event) => {
 					set_api_docs_visible(false);
 					api_calls = [];
-					api_recorder_visible = event.detail?.api_recorder_visible;
+					api_recorder_visible = api_recorder_visible =
+						event.detail?.api_recorder_visible;
 				}}
 				{dependencies}
 				{root}
@@ -844,7 +1098,7 @@
 	</div>
 {/if}
 
-{#if settings_visible && $_layout && app.config}
+{#if settings_visible && $_layout && app.config && Settings}
 	<div class="api-docs">
 		<!-- TODO: fix -->
 		<!-- svelte-ignore a11y-click-events-have-key-events-->
@@ -856,9 +1110,15 @@
 			}}
 		/>
 		<div class="api-docs-wrap">
-			<Settings
-				on:close={(event) => {
+			<svelte:component
+				this={Settings}
+				bind:allow_zoom
+				bind:allow_video_trim
+				on:close={() => {
 					set_settings_visible(false);
+				}}
+				on:start_recording={() => {
+					screen_recording();
 				}}
 				pwa_enabled={app.config.pwa}
 				{root}
@@ -893,13 +1153,14 @@
 		margin-top: var(--size-4);
 		color: var(--body-text-color-subdued);
 	}
-
-	footer > * + * {
-		margin-left: var(--size-2);
+	.divider {
+		margin-left: var(--size-1);
+		margin-right: var(--size-2);
 	}
 
 	.show-api,
-	.settings {
+	.settings,
+	.record {
 		display: flex;
 		align-items: center;
 	}
@@ -919,13 +1180,20 @@
 		width: var(--size-4);
 	}
 
+	.record img {
+		margin-right: var(--size-1);
+		margin-left: var(--size-1);
+		width: var(--size-3);
+	}
+
 	.built-with {
 		display: flex;
 		align-items: center;
 	}
 
 	.built-with:hover,
-	.settings:hover {
+	.settings:hover,
+	.record:hover {
 		color: var(--body-text-color);
 	}
 
@@ -987,12 +1255,17 @@
 	}
 
 	@media (max-width: 640px) {
-		.show-api {
+		.show-api,
+		.show-api-divider {
 			display: none;
 		}
 	}
 
 	.show-api:hover {
 		color: var(--body-text-color);
+	}
+
+	.hidden {
+		display: none;
 	}
 </style>

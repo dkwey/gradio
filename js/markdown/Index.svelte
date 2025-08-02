@@ -6,12 +6,12 @@
 <script lang="ts">
 	import type { Gradio, CopyData } from "@gradio/utils";
 	import Markdown from "./shared/Markdown.svelte";
+	import type { ThemeMode } from "@gradio/core";
 
 	import { StatusTracker } from "@gradio/statustracker";
 	import type { LoadingStatus } from "@gradio/statustracker";
 	import { Block } from "@gradio/atoms";
 
-	export let label: string;
 	export let elem_id = "";
 	export let elem_classes: string[] = [];
 	export let visible = true;
@@ -36,8 +36,8 @@
 	export let max_height: number | string | undefined;
 	export let show_copy_button = false;
 	export let container = false;
-
-	$: label, gradio.dispatch("change");
+	export let theme_mode: ThemeMode;
+	export let padding = false;
 </script>
 
 <Block
@@ -58,7 +58,7 @@
 		variant="center"
 		on:clear_status={() => gradio.dispatch("clear_status", loading_status)}
 	/>
-	<div class:pending={loading_status?.status === "pending"}>
+	<div class:padding class:pending={loading_status?.status === "pending"}>
 		<Markdown
 			{value}
 			{elem_classes}
@@ -71,8 +71,8 @@
 			{line_breaks}
 			{header_links}
 			{show_copy_button}
-			root={gradio.root}
 			{loading_status}
+			{theme_mode}
 		/>
 	</div>
 </Block>
@@ -84,5 +84,9 @@
 
 	.pending {
 		opacity: 0.2;
+	}
+
+	.padding {
+		padding: var(--block-padding);
 	}
 </style>

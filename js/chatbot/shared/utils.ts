@@ -13,9 +13,44 @@ import type {
 } from "../types";
 import type { LoadedComponent } from "../../core/src/types";
 import { Gradio } from "@gradio/utils";
+
 export const format_chat_for_sharing = async (
-	chat: NormalisedMessage[]
+	chat: NormalisedMessage[],
+	url_length_limit = 1800
 ): Promise<string> => {
+	let messages_to_share = [...chat];
+	let formatted = await format_messages(messages_to_share);
+
+	if (formatted.length > url_length_limit && messages_to_share.length > 2) {
+		const first_message = messages_to_share[0];
+		const last_message = messages_to_share[messages_to_share.length - 1];
+		messages_to_share = [first_message, last_message];
+		formatted = await format_messages(messages_to_share);
+	}
+
+	if (formatted.length > url_length_limit && messages_to_share.length > 0) {
+		const truncated_messages = messages_to_share.map((msg) => {
+			if (msg.type === "text") {
+				const max_length =
+					Math.floor(url_length_limit / messages_to_share.length) - 20;
+				if (msg.content.length > max_length) {
+					return {
+						...msg,
+						content: msg.content.substring(0, max_length) + "..."
+					};
+				}
+			}
+			return msg;
+		});
+
+		messages_to_share = truncated_messages;
+		formatted = await format_messages(messages_to_share);
+	}
+
+	return formatted;
+};
+
+const format_messages = async (chat: NormalisedMessage[]): Promise<string> => {
 	let messages = await Promise.all(
 		chat.map(async (message) => {
 			if (message.role === "system") return "";
@@ -59,7 +94,7 @@ export const format_chat_for_sharing = async (
 			return `${speaker_emoji}: ${html_content}`;
 		})
 	);
-	return messages.join("\n");
+	return messages.filter((msg) => msg !== "").join("\n");
 };
 
 export interface UndoRetryData {
@@ -77,12 +112,30 @@ const redirect_src_url = (src: string, root: string): string =>
 	src.replace('src="/file', `src="${root}file`);
 
 function get_component_for_mime_type(
-	mime_type: string | null | undefined
+	mime_type: string | null | undefined,
+	file?: { path?: string }
 ): string {
-	if (!mime_type) return "file";
+	if (!mime_type) {
+		const path = file?.path;
+		if (path) {
+			const lower_path = path.toLowerCase();
+			if (
+				lower_path.endsWith(".glb") ||
+				lower_path.endsWith(".gltf") ||
+				lower_path.endsWith(".obj") ||
+				lower_path.endsWith(".stl") ||
+				lower_path.endsWith(".splat") ||
+				lower_path.endsWith(".ply")
+			) {
+				return "model3d";
+			}
+		}
+		return "file";
+	}
 	if (mime_type.includes("audio")) return "audio";
 	if (mime_type.includes("video")) return "video";
 	if (mime_type.includes("image")) return "image";
+	if (mime_type.includes("model")) return "model3d";
 	return "file";
 }
 
@@ -91,7 +144,7 @@ function convert_file_message_to_component_message(
 ): ComponentData {
 	const _file = Array.isArray(message.file) ? message.file[0] : message.file;
 	return {
-		component: get_component_for_mime_type(_file?.mime_type),
+		component: get_component_for_mime_type(_file?.mime_type, _file),
 		value: message.file,
 		alt_text: message.alt_text,
 		constructor_args: {},
@@ -218,7 +271,8 @@ export function is_last_bot_message(
 
 export function group_messages(
 	messages: NormalisedMessage[],
-	msg_format: "messages" | "tuples"
+	msg_format: "messages" | "tuples",
+	display_consecutive_in_same_bubble = true
 ): NormalisedMessage[][] {
 	const groupedMessages: NormalisedMessage[][] = [];
 	let currentGroup: NormalisedMessage[] = [];
@@ -228,6 +282,13 @@ export function group_messages(
 		if (!(message.role === "assistant" || message.role === "user")) {
 			continue;
 		}
+
+		// If display_consecutive_in_same_bubble is false, each message should be its own group
+		if (!display_consecutive_in_same_bubble) {
+			groupedMessages.push([message]);
+			continue;
+		}
+
 		if (message.role === currentRole) {
 			currentGroup.push(message);
 		} else {
@@ -258,15 +319,25 @@ export async function load_components(
 		if (_components[component_name] || component_name === "file") {
 			return;
 		}
-		const variant = component_name === "dataframe" ? "component" : "base";
+		const variant =
+			component_name === "dataframe" || component_name === "model3d"
+				? "component"
+				: "base";
 		const { name, component } = load_component(component_name, variant);
 		names.push(name);
 		components.push(component);
 		component_name;
 	});
-	const loaded_components: LoadedComponent[] = await Promise.all(components);
-	loaded_components.forEach((component, i) => {
-		_components[names[i]] = component.default;
+
+	const resolved_components = await Promise.allSettled(components);
+	const supported_components: [number, LoadedComponent][] = resolved_components
+		.map((result, index) =>
+			result.status === "fulfilled" ? [index, result.value] : null
+		)
+		.filter((item): item is [number, LoadedComponent] => item !== null);
+
+	supported_components.forEach(([originalIndex, component]) => {
+		_components[names[originalIndex]] = component.default;
 	});
 
 	return _components;

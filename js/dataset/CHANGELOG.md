@@ -1,5 +1,219 @@
 # @gradio/dataset
 
+## 0.4.29
+
+### Dependency updates
+
+- @gradio/upload@0.16.12
+- @gradio/client@1.15.7
+
+## 0.4.28
+
+### Dependency updates
+
+- @gradio/textbox@0.10.18
+
+## 0.4.27
+
+### Dependency updates
+
+- @gradio/client@1.15.6
+- @gradio/upload@0.16.11
+- @gradio/textbox@0.10.17
+
+## 0.4.26
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+- @gradio/upload@0.16.10
+- @gradio/client@1.15.5
+- @gradio/textbox@0.10.16
+
+## 0.4.25
+
+### Dependency updates
+
+- @gradio/upload@0.16.9
+- @gradio/client@1.15.4
+
+## 0.4.24
+
+### Dependency updates
+
+- @gradio/atoms@0.16.2
+- @gradio/client@1.15.3
+- @gradio/upload@0.16.8
+- @gradio/textbox@0.10.15
+
+## 0.4.23
+
+### Dependency updates
+
+- @gradio/textbox@0.10.14
+
+## 0.4.22
+
+### Dependency updates
+
+- @gradio/upload@0.16.7
+- @gradio/client@1.15.2
+
+## 0.4.21
+
+### Dependency updates
+
+- @gradio/textbox@0.10.13
+
+## 0.4.20
+
+### Dependency updates
+
+- @gradio/client@1.15.1
+- @gradio/upload@0.16.6
+- @gradio/textbox@0.10.12
+
+## 0.4.19
+
+### Dependency updates
+
+- @gradio/atoms@0.16.1
+- @gradio/client@1.15.0
+- @gradio/upload@0.16.5
+- @gradio/textbox@0.10.11
+
+## 0.4.18
+
+### Fixes
+
+- [#11181](https://github.com/gradio-app/gradio/pull/11181) [`ee7f17e`](https://github.com/gradio-app/gradio/commit/ee7f17e25642bc4b86f2272b3b5cfcf77c08adf1) - Fix the `.select()` event in `gr.Dataset` in table layout.  Thanks @abidlabs!
+
+## 0.4.17
+
+### Dependency updates
+
+- @gradio/upload@0.16.4
+
+## 0.4.16
+
+### Dependency updates
+
+- @gradio/upload@0.16.3
+- @gradio/atoms@0.16.0
+- @gradio/textbox@0.10.10
+
+## 0.4.15
+
+### Dependency updates
+
+- @gradio/atoms@0.15.2
+- @gradio/client@1.14.2
+- @gradio/utils@0.10.2
+- @gradio/upload@0.16.2
+- @gradio/textbox@0.10.9
+
+## 0.4.14
+
+### Dependency updates
+
+- @gradio/upload@0.16.1
+- @gradio/atoms@0.15.1
+- @gradio/textbox@0.10.8
+
+## 0.4.13
+
+### Dependency updates
+
+- @gradio/atoms@0.15.0
+- @gradio/upload@0.16.0
+- @gradio/textbox@0.10.7
+
+## 0.4.12
+
+### Dependency updates
+
+- @gradio/client@1.14.1
+- @gradio/upload@0.15.7
+
+## 0.4.11
+
+### Dependency updates
+
+- @gradio/atoms@0.14.1
+- @gradio/client@1.14.0
+- @gradio/upload@0.15.6
+- @gradio/textbox@0.10.6
+
+## 0.4.10
+
+### Dependency updates
+
+- @gradio/upload@0.15.5
+- @gradio/atoms@0.14.0
+- @gradio/textbox@0.10.5
+
+## 0.4.9
+
+### Dependency updates
+
+- @gradio/client@1.13.1
+- @gradio/upload@0.15.4
+
+## 0.4.8
+
+### Dependency updates
+
+- @gradio/upload@0.15.3
+- @gradio/client@1.13.0
+
+## 0.4.7
+
+### Dependency updates
+
+- @gradio/upload@0.15.2
+- @gradio/atoms@0.13.3
+- @gradio/textbox@0.10.4
+
+## 0.4.6
+
+### Dependency updates
+
+- @gradio/atoms@0.13.2
+- @gradio/utils@0.10.1
+- @gradio/client@1.12.0
+- @gradio/upload@0.15.1
+- @gradio/textbox@0.10.3
+
+## 0.4.5
+
+### Dependency updates
+
+- @gradio/client@1.11.0
+- @gradio/upload@0.15.0
+
+## 0.4.4
+
+### Dependency updates
+
+- @gradio/upload@0.14.8
+
+## 0.4.3
+
+### Dependency updates
+
+- @gradio/upload@0.14.7
+
+## 0.4.2
+
+### Fixes
+
+- [#10369](https://github.com/gradio-app/gradio/pull/10369) [`eb85edf`](https://github.com/gradio-app/gradio/commit/eb85edf4b27b33038c0923387d6d1a6f57a73980) - Quick fix: 0 is ignored Slider/Number issue.  Thanks @dawoodkhan82!
+
+### Dependency updates
+
+- @gradio/upload@0.14.6
+- @gradio/textbox@0.10.2
+
 ## 0.4.1
 
 ### Dependency updates

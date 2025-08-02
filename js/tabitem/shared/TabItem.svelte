@@ -11,6 +11,7 @@
 	export let visible: boolean;
 	export let interactive: boolean;
 	export let order: number;
+	export let scale: number;
 
 	const dispatch = createEventDispatcher<{ select: SelectData }>();
 
@@ -20,7 +21,7 @@
 	let tab_index: number;
 
 	$: tab_index = register_tab(
-		{ label, id, elem_id, visible, interactive },
+		{ label, id, elem_id, visible, interactive, scale },
 		order
 	);
 
@@ -32,28 +33,33 @@
 		tick().then(() => dispatch("select", { value: label, index: tab_index }));
 </script>
 
-<!-- {#if $selected_tab === id && visible} -->
-<div
-	id={elem_id}
-	class="tabitem {elem_classes.join(' ')}"
-	style:display={$selected_tab === id && visible ? "block" : "none"}
-	role="tabpanel"
->
-	<Column>
-		<slot />
-	</Column>
-</div>
-
-<!-- {/if} -->
+{#if $selected_tab === id && visible}
+	<div
+		id={elem_id}
+		class="tabitem {elem_classes.join(' ')}"
+		class:grow-children={scale >= 1}
+		style:display={$selected_tab === id && visible ? "flex" : "none"}
+		style:flex-grow={scale}
+		role="tabpanel"
+	>
+		<Column scale={scale >= 1 ? scale : null}>
+			<slot />
+		</Column>
+	</div>
+{/if}
 
 <style>
 	div {
-		display: block;
+		display: flex;
+		flex-direction: column;
 		position: relative;
 		border: none;
 		border-radius: var(--radius-sm);
 		padding: var(--block-padding);
 		width: 100%;
 		box-sizing: border-box;
+	}
+	.grow-children > :global(.column > .column) {
+		flex-grow: 1;
 	}
 </style>

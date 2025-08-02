@@ -1,5 +1,171 @@
 # @gradio/upload
 
+## 0.16.12
+
+### Dependency updates
+
+- @gradio/client@1.15.7
+
+## 0.16.11
+
+### Dependency updates
+
+- @gradio/client@1.15.6
+
+## 0.16.10
+
+### Dependency updates
+
+- @gradio/atoms@0.16.3
+- @gradio/client@1.15.5
+
+## 0.16.9
+
+### Dependency updates
+
+- @gradio/client@1.15.4
+
+## 0.16.8
+
+### Dependency updates
+
+- @gradio/atoms@0.16.2
+- @gradio/client@1.15.3
+
+## 0.16.7
+
+### Dependency updates
+
+- @gradio/client@1.15.2
+
+## 0.16.6
+
+### Dependency updates
+
+- @gradio/client@1.15.1
+
+## 0.16.5
+
+### Dependency updates
+
+- @gradio/atoms@0.16.1
+- @gradio/client@1.15.0
+
+## 0.16.4
+
+### Fixes
+
+- [#11098](https://github.com/gradio-app/gradio/pull/11098) [`49ad594`](https://github.com/gradio-app/gradio/commit/49ad5943eeab96b153f0b56fe8d42d755fe1e0f8) - Fix #10281: Dragging image replaces existing instead of opening new tab.  Thanks @Martim-Rito!
+
+## 0.16.3
+
+### Dependency updates
+
+- @gradio/atoms@0.16.0
+
+## 0.16.2
+
+### Dependency updates
+
+- @gradio/atoms@0.15.2
+- @gradio/client@1.14.2
+- @gradio/utils@0.10.2
+
+## 0.16.1
+
+### Dependency updates
+
+- @gradio/atoms@0.15.1
+- @gradio/icons@0.12.0
+
+## 0.16.0
+
+### Features
+
+- [#10635](https://github.com/gradio-app/gradio/pull/10635) [`2f68c9d`](https://github.com/gradio-app/gradio/commit/2f68c9d988dcbc53a0b8e53bdb1de49c9c8c65d8) - Refactor and redesign `ImageEditor` component.  Thanks @pngwn!
+
+### Dependency updates
+
+- @gradio/atoms@0.15.0
+- @gradio/icons@0.11.0
+
+## 0.15.7
+
+### Dependency updates
+
+- @gradio/wasm@0.18.1
+- @gradio/client@1.14.1
+
+## 0.15.6
+
+### Dependency updates
+
+- @gradio/atoms@0.14.1
+- @gradio/client@1.14.0
+- @gradio/wasm@0.18.0
+
+## 0.15.5
+
+### Dependency updates
+
+- @gradio/atoms@0.14.0
+
+## 0.15.4
+
+### Dependency updates
+
+- @gradio/client@1.13.1
+- @gradio/wasm@0.17.4
+
+## 0.15.3
+
+### Dependency updates
+
+- @gradio/client@1.13.0
+
+## 0.15.2
+
+### Dependency updates
+
+- @gradio/atoms@0.13.3
+
+## 0.15.1
+
+### Dependency updates
+
+- @gradio/atoms@0.13.2
+- @gradio/utils@0.10.1
+- @gradio/client@1.12.0
+- @gradio/wasm@0.17.3
+
+## 0.15.0
+
+### Features
+
+- [#10478](https://github.com/gradio-app/gradio/pull/10478) [`afb96c6`](https://github.com/gradio-app/gradio/commit/afb96c64451e5a282bfee89445d831d1c87f9746) - Improve dataframe's upload accessibility.  Thanks @hannahblair!
+
+### Dependency updates
+
+- @gradio/client@1.11.0
+
+## 0.14.8
+
+### Dependency updates
+
+- @gradio/wasm@0.17.2
+
+## 0.14.7
+
+### Dependency updates
+
+- @gradio/wasm@0.17.1
+
+## 0.14.6
+
+### Dependency updates
+
+- @gradio/wasm@0.17.0
+
 ## 0.14.5
 
 ### Dependency updates

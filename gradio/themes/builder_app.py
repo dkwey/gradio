@@ -256,9 +256,9 @@ with gr.Blocks(  # noqa: SIM117
                 for variable in flat_variables:
                     if variable.endswith("_dark"):
                         continue
-                    for style_type in variable_suggestions:
+                    for style_type, suggestions in variable_suggestions.items():
                         if style_type in variable:
-                            variable_suggestions[style_type].append("*" + variable)
+                            suggestions.append("*" + variable)
                             break
 
                 variable_suggestions["fill"], variable_suggestions["color"] = (
@@ -540,9 +540,9 @@ with gr.Blocks(  # noqa: SIM117
                 + text_size.expand()
                 + spacing_size.expand()
                 + radius_size.expand()
-                + pad_to_4([f.name for f in font])
+                + pad_to_4([f.name if hasattr(f, "name") else f for f in font])
                 + pad_to_4(font_is_google)
-                + pad_to_4([f.name for f in font_mono])
+                + pad_to_4([f.name if hasattr(f, "name") else f for f in font_mono])
                 + pad_to_4(font_mono_is_google)
                 + var_output
             )
@@ -676,7 +676,7 @@ with gr.Blocks(  # noqa: SIM117
                 for var_name in core_var_names:
                     if var_name in specific_core_diffs:
                         cls, vals = specific_core_diffs[var_name]
-                        core_diffs_code += f"""    {var_name}=gr.themes.{cls.__name__}({', '.join(f'''{k}="{v}"''' for k, v in vals.items())}),\n"""
+                        core_diffs_code += f"""    {var_name}=gr.themes.{cls.__name__}({", ".join(f'''{k}="{v}"''' for k, v in vals.items())}),\n"""
                     elif var_name in core_diffs:
                         var_val = core_diffs[var_name]
                         if var_name.endswith("_size"):
@@ -706,7 +706,7 @@ with gr.Blocks(  # noqa: SIM117
             vars_diff_code = ""
             if len(var_diffs) > 0:
                 vars_diff_code = f""".set(
-    {(',' + newline + "    ").join([f"{k}='{v}'" for k, v in var_diffs.items()])}
+    {("," + newline + "    ").join([f"{k}='{v}'" for k, v in var_diffs.items()])}
 )"""
 
             output = f"""
@@ -849,20 +849,22 @@ with gr.Blocks(theme=theme) as demo:
                 None,
                 js="""(css, fonts) => {
                     document.getElementById('theme_css').innerHTML = css;
-                    let existing_font_links = document.querySelectorAll('link[rel="stylesheet"][href^="https://fonts.googleapis.com/css"]');
-                    existing_font_links.forEach(link => {
-                        if (fonts.includes(link.href)) {
-                            fonts = fonts.filter(font => font != link.href);
-                        } else {
-                            link.remove();
-                        }
-                    });
-                    fonts.forEach(font => {
-                        let link = document.createElement('link');
-                        link.rel = 'stylesheet';
-                        link.href = font;
-                        document.head.appendChild(link);
-                    });
+                    if (fonts && Array.isArray(fonts)) {
+                        let existing_font_links = document.querySelectorAll('link[rel="stylesheet"][href^="https://fonts.googleapis.com/css"]');
+                        existing_font_links.forEach(link => {
+                            if (fonts.includes(link.href)) {
+                                fonts = fonts.filter(font => font != link.href);
+                            } else {
+                                link.remove();
+                            }
+                        });
+                        fonts.forEach(font => {
+                            let link = document.createElement('link');
+                            link.rel = 'stylesheet';
+                            link.href = font;
+                            document.head.appendChild(link);
+                        });
+                    }
                 }""",
                 show_api=False,
             )

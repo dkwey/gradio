@@ -8,6 +8,7 @@ from pathlib import Path
 
 from jinja2 import Template
 
+from gradio import wasm_utils
 from gradio.events import EventListener
 from gradio.exceptions import ComponentDefinitionError
 from gradio.utils import no_raise_exception
@@ -18,6 +19,7 @@ INTERFACE_TEMPLATE = '''
     from gradio.blocks import Block
     if TYPE_CHECKING:
         from gradio.components import Timer
+        from gradio.components.base import Component
 
     {% for event in events %}
     def {{ event.event_name }}(self,
@@ -27,6 +29,7 @@ INTERFACE_TEMPLATE = '''
         api_name: str | None | Literal[False] = None,
         scroll_to_output: bool = False,
         show_progress: Literal["full", "minimal", "hidden"] = "full",
+        show_progress_on: Component | Sequence[Component] | None = None,
         queue: bool | None = None,
         batch: bool = False,
         max_batch_size: int = 4,
@@ -35,10 +38,12 @@ INTERFACE_TEMPLATE = '''
         cancels: dict[str, Any] | list[dict[str, Any]] | None = None,
         every: Timer | float | None = None,
         trigger_mode: Literal["once", "multiple", "always_last"] | None = None,
-        js: str | None = None,
+        js: str | Literal[True] | None = None,
         concurrency_limit: int | None | Literal["default"] = "default",
         concurrency_id: str | None = None,
         show_api: bool = True,
+        key: int | str | tuple[int | str, ...] | None = None,
+        api_description: str | None | Literal[False] = None,
     {% for arg in event.event_specific_args %}
         {{ arg.name }}: {{ arg.type }},
     {% endfor %}
@@ -51,6 +56,7 @@ INTERFACE_TEMPLATE = '''
             api_name: defines how the endpoint appears in the API docs. Can be a string, None, or False. If False, the endpoint will not be exposed in the api docs. If set to None, will use the functions name as the endpoint route. If set to a string, the endpoint will be exposed in the api docs with the given name.
             scroll_to_output: if True, will scroll to output component on completion
             show_progress: how to show the progress animation while event is running: "full" shows a spinner which covers the output component area as well as a runtime display in the upper right corner, "minimal" only shows the runtime display, "hidden" shows no progress animation at all
+            show_progress_on: Component or list of components to show the progress animation on. If None, will show the progress animation on all of the output components.
             queue: if True, will place the request on the queue, if the queue has been enabled. If False, will not put this event on the queue, even if the queue has been enabled. If None, will use the queue setting of the gradio app.
             batch: if True, then the function should process a batch of inputs, meaning that it should accept a list of input values for each parameter. The lists should be of equal length (and be up to length `max_batch_size`). The function is then *required* to return a tuple of lists (even if there is only 1 output component), with each list in the tuple corresponding to one output component.
             max_batch_size: maximum number of inputs to batch together if this is called from the queue (only relevant if batch=True)
@@ -63,6 +69,8 @@ INTERFACE_TEMPLATE = '''
             concurrency_limit: if set, this is the maximum number of this event that can be running simultaneously. Can be set to None to mean no concurrency_limit (any number of this event can be running simultaneously). Set to "default" to use the default concurrency limit (defined by the `default_concurrency_limit` parameter in `Blocks.queue()`, which itself is 1 by default).
             concurrency_id: if set, this is the id of the concurrency group. Events with the same concurrency_id will be limited by the lowest set concurrency_limit.
             show_api: whether to show this event in the "view API" page of the Gradio app, or in the ".view_api()" method of the Gradio clients. Unlike setting api_name to False, setting show_api to False will still allow downstream apps as well as the Clients to use this event. If fn is None, show_api will automatically be set to False.
+            key: A unique key for this event listener to be used in @gr.render(). If set, this value identifies an event as identical across re-renders when the key is identical.
+            api_description: Description of the API endpoint. Can be a string, None, or False. If set to a string, the endpoint will be exposed in the API docs with the given description. If None, the function's docstring will be used as the API endpoint description. If False, then no description will be displayed in the API docs.
         {% for arg in event.event_specific_args %}
             {{ arg.name }}: {{ arg.doc }},
         {% endfor %}
@@ -130,17 +138,18 @@ def create_or_modify_pyi(
         )
         with no_raise_exception():
             pyi_file.write_text("\n".join(lines))
-    current_interface, _ = extract_class_source_code(pyi_file.read_text(), class_name)
-    if not current_interface:
-        with no_raise_exception():
+    with no_raise_exception():
+        current_interface, _ = extract_class_source_code(
+            pyi_file.read_text(), class_name
+        )
+        if not current_interface:
             with open(str(pyi_file), mode="a") as f:
                 f.write(new_interface)
-    else:
-        contents = pyi_file.read_text()
-        contents = contents.replace(current_interface, new_interface.strip())
-        current_contents = pyi_file.read_text()
-        if current_contents != contents:
-            with no_raise_exception():
+        else:
+            contents = pyi_file.read_text()
+            contents = contents.replace(current_interface, new_interface.strip())
+            current_contents = pyi_file.read_text()
+            if current_contents != contents:
                 pyi_file.write_text(contents)
 
 
@@ -215,5 +224,6 @@ class ComponentMeta(ABCMeta):
         if "EVENTS" in attrs:
             attrs["EVENTS"] = new_events
         component_class = super().__new__(cls, name, bases, attrs)
-        create_or_modify_pyi(component_class, name, events)
+        if not wasm_utils.IS_WASM:
+            create_or_modify_pyi(component_class, name, events)
         return component_class

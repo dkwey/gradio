@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import hashlib
 import json
@@ -16,14 +17,14 @@ import time
 import urllib.parse
 import uuid
 import warnings
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
 from datetime import datetime
 from functools import partial
 from pathlib import Path
 from threading import Lock
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import httpx
 import huggingface_hub
@@ -48,6 +49,7 @@ from gradio_client.utils import (
     ServerMessage,
     Status,
     StatusUpdate,
+    Update,
 )
 
 DEFAULT_TEMP_DIR = os.environ.get("GRADIO_TEMP_DIR") or str(
@@ -86,6 +88,7 @@ class Client:
         download_files: str | Path | Literal[False] = DEFAULT_TEMP_DIR,
         ssl_verify: bool = True,
         _skip_components: bool = True,  # internal parameter to skip values certain components (e.g. State) that do not need to be displayed to users.
+        analytics_enabled: bool = True,
     ):
         """
         Parameters:
@@ -97,6 +100,7 @@ class Client:
             download_files: directory where the client should download output files  on the local machine from the remote API. By default, uses the value of the GRADIO_TEMP_DIR environment variable which, if not set by the user, is a temporary directory on your machine. If False, the client does not download files and returns a FileData dataclass object with the filepath on the remote machine instead.
             ssl_verify: if False, skips certificate validation which allows the client to connect to Gradio apps that are using self-signed certificates.
             httpx_kwargs: additional keyword arguments to pass to `httpx.Client`, `httpx.stream`, `httpx.get` and `httpx.post`. This can be used to set timeouts, proxies, http auth, etc.
+            analytics_enabled: Whether to allow basic telemetry. If None, will use GRADIO_ANALYTICS_ENABLED environment variable or default to True.
         """
         self.verbose = verbose
         self.hf_token = hf_token
@@ -111,7 +115,10 @@ class Client:
             self.headers.update(headers)
         self.ssl_verify = ssl_verify
         self.space_id = None
-        self.cookies: dict[str, str] = {}
+        self.httpx_kwargs = {} if httpx_kwargs is None else httpx_kwargs
+        self.cookies: dict[str, str] = dict(
+            (self.httpx_kwargs.pop("cookies", {})) or {}
+        )
         if isinstance(self.download_files, (str, Path)):
             if not os.path.exists(self.download_files):
                 os.makedirs(self.download_files, exist_ok=True)
@@ -146,7 +153,6 @@ class Client:
         if self.verbose:
             print(f"Loaded as API: {self.src} ✔")
 
-        self.httpx_kwargs = {} if httpx_kwargs is None else httpx_kwargs
         if auth is not None:
             self._login(auth)
 
@@ -193,8 +199,11 @@ class Client:
         # Create a pool of threads to handle the requests
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
 
-        # Disable telemetry by setting the env variable HF_HUB_DISABLE_TELEMETRY=1
-        threading.Thread(target=self._telemetry_thread, daemon=True).start()
+        self.analytics_enabled = (
+            analytics_enabled or os.getenv("GRADIO_ANALYTICS_ENABLED", "True") == "True"
+        )
+        if self.analytics_enabled:
+            threading.Thread(target=self._telemetry_thread, daemon=True).start()
         self._refresh_heartbeat = threading.Event()
         self._kill_heartbeat = threading.Event()
 
@@ -250,39 +259,44 @@ class Client:
                     headers=self.headers,
                     cookies=self.cookies,
                 ) as response:
-                    for line in response.iter_lines():
-                        line = line.rstrip("\n")
-                        if not len(line):
-                            continue
-                        if line.startswith("data:"):
-                            resp = json.loads(line[5:])
-                            if resp["msg"] == ServerMessage.heartbeat:
+                    buffer = b""
+                    for chunk in response.iter_bytes():
+                        buffer += chunk
+                        while b"\n\n" in buffer:
+                            line, buffer = buffer.split(b"\n\n", 1)
+                            line = line.decode("utf-8").rstrip("\n")
+                            if not len(line):
                                 continue
-                            elif (
-                                resp.get("message", "") == ServerMessage.server_stopped
-                            ):
-                                for (
-                                    pending_messages
-                                ) in self.pending_messages_per_event.values():
-                                    pending_messages.append(resp)
-                                return
-                            elif resp["msg"] == ServerMessage.close_stream:
-                                self.stream_open = False
-                                return
-                            event_id = resp["event_id"]
-                            if event_id not in self.pending_messages_per_event:
-                                self.pending_messages_per_event[event_id] = []
-                            self.pending_messages_per_event[event_id].append(resp)
-                            if resp["msg"] == ServerMessage.process_completed:
-                                self.pending_event_ids.remove(event_id)
-                            if (
-                                len(self.pending_event_ids) == 0
-                                and protocol != "sse_v3"
-                            ):
-                                self.stream_open = False
-                                return
-                        else:
-                            raise ValueError(f"Unexpected SSE line: '{line}'")
+                            if line.startswith("data:"):
+                                resp = json.loads(line[5:])
+                                if resp["msg"] == ServerMessage.heartbeat:
+                                    continue
+                                elif (
+                                    resp.get("message", "")
+                                    == ServerMessage.server_stopped
+                                ):
+                                    for (
+                                        pending_messages
+                                    ) in self.pending_messages_per_event.values():
+                                        pending_messages.append(resp)
+                                    return
+                                elif resp["msg"] == ServerMessage.close_stream:
+                                    self.stream_open = False
+                                    return
+                                event_id = resp["event_id"]
+                                if event_id not in self.pending_messages_per_event:
+                                    self.pending_messages_per_event[event_id] = []
+                                self.pending_messages_per_event[event_id].append(resp)
+                                if resp["msg"] == ServerMessage.process_completed:
+                                    self.pending_event_ids.remove(event_id)
+                                if (
+                                    len(self.pending_event_ids) == 0
+                                    and protocol != "sse_v3"
+                                ):
+                                    self.stream_open = False
+                                    return
+                            else:
+                                raise ValueError(f"Unexpected SSE line: '{line}'")
         except BaseException as e:
             # If the job is cancelled the stream will close so we
             # should not raise this httpx exception that comes from the
@@ -294,11 +308,14 @@ class Client:
             traceback.print_exc()
             raise e
 
-    def send_data(self, data, hash_data, protocol):
+    def send_data(self, data, hash_data, protocol, request_headers):
+        headers = self.add_zero_gpu_headers(self.headers)
+        if request_headers is not None:
+            headers = {**request_headers, **headers}
         req = httpx.post(
             self.sse_data_url,
             json={**data, **hash_data},
-            headers=self.headers,
+            headers=headers,
             cookies=self.cookies,
             verify=self.ssl_verify,
             **self.httpx_kwargs,
@@ -454,15 +471,18 @@ class Client:
         *args,
         api_name: str | None = None,
         fn_index: int | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs,
     ) -> Any:
         """
-        Calls the Gradio API and returns the result (this is a blocking call).
+        Calls the Gradio API and returns the result (this is a blocking call). Arguments can be provided as positional arguments or as keyword arguments (latter is recommended).
 
         Parameters:
-            args: The arguments to pass to the remote API. The order of the arguments must match the order of the inputs in the Gradio app.
+            args: The positional arguments to pass to the remote API endpoint. The order of the arguments must match the order of the inputs in the Gradio app.
             api_name: The name of the API endpoint to call starting with a leading slash, e.g. "/predict". Does not need to be provided if the Gradio app has only one named API endpoint.
             fn_index: As an alternative to api_name, this parameter takes the index of the API endpoint to call, e.g. 0. Both api_name and fn_index can be provided, but if they conflict, api_name will take precedence.
+            kwargs: The keyword arguments to pass to the remote API endpoint.
+            headers: Additional headers to send to the remote Gradio app on this request. This parameter will overrides the headers provided in the Client constructor if they have the same keys.
         Returns:
             The result of the API call. Will be a Tuple if the API has multiple outputs.
         Example:
@@ -473,15 +493,18 @@ class Client:
         """
         self._infer_fn_index(api_name, fn_index)
         return self.submit(
-            *args, api_name=api_name, fn_index=fn_index, **kwargs
+            *args, api_name=api_name, fn_index=fn_index, headers=headers, **kwargs
         ).result()
 
-    def new_helper(self, fn_index: int) -> Communicator:
+    def new_helper(
+        self, fn_index: int, headers: dict[str, str] | None = None
+    ) -> Communicator:
         return Communicator(
             Lock(),
             JobStatus(),
             self.endpoints[fn_index].process_predictions,
             self.reset_url,
+            request_headers=headers,
         )
 
     def submit(
@@ -489,17 +512,21 @@ class Client:
         *args,
         api_name: str | None = None,
         fn_index: int | None = None,
+        headers: dict[str, str] | None = None,
         result_callbacks: Callable | list[Callable] | None = None,
         **kwargs,
     ) -> Job:
         """
         Creates and returns a Job object which calls the Gradio API in a background thread. The job can be used to retrieve the status and result of the remote API call.
+         Arguments can be provided as positional arguments or as keyword arguments (latter is recommended).
 
         Parameters:
             args: The arguments to pass to the remote API. The order of the arguments must match the order of the inputs in the Gradio app.
             api_name: The name of the API endpoint to call starting with a leading slash, e.g. "/predict". Does not need to be provided if the Gradio app has only one named API endpoint.
             fn_index: As an alternative to api_name, this parameter takes the index of the API endpoint to call, e.g. 0. Both api_name and fn_index can be provided, but if they conflict, api_name will take precedence.
             result_callbacks: A callback function, or list of callback functions, to be called when the result is ready. If a list of functions is provided, they will be called in order. The return values from the remote API are provided as separate parameters into the callback. If None, no callback will be called.
+            kwargs: The keyword arguments to pass to the remote API endpoint.
+            headers: Additional headers to send to the remote Gradio app on this request. This parameter will overrides the headers provided in the Client constructor if they have the same keys.
         Returns:
             A Job object that can be used to retrieve the status and result of the remote API call.
         Example:
@@ -527,8 +554,12 @@ class Client:
             "sse_v2.1",
             "sse_v3",
         ):
-            helper = self.new_helper(inferred_fn_index)
-        end_to_end_fn = endpoint.make_end_to_end_fn(helper)
+            helper = self.new_helper(inferred_fn_index, headers=headers)
+            end_to_end_fn = endpoint.make_end_to_end_fn(helper)
+        else:
+            end_to_end_fn = cast(EndpointV3Compatibility, endpoint).make_end_to_end_fn(
+                None
+            )
         future = self.executor.submit(end_to_end_fn, *args)
 
         cancel_fn = endpoint.make_cancel(helper)
@@ -580,6 +611,9 @@ class Client:
                     "config": json.dumps(self.config),
                     "serialize": False,
                 },
+                headers=self.headers,
+                cookies=self.cookies,
+                verify=self.ssl_verify,
                 **self.httpx_kwargs,
             )
             if fetch.is_success:
@@ -659,6 +693,7 @@ class Client:
                             ]
                         }
                     }
+                }
                 'unnamed_endpoints': {
                     2: {
                         'parameters': [
@@ -704,6 +739,27 @@ class Client:
         self.session_hash = str(uuid.uuid4())
         self._refresh_heartbeat.set()
 
+    def add_zero_gpu_headers(self, headers: dict[str, str]) -> dict[str, str]:
+        """
+        Adds the x-ip-token header to the headers dictionary to pass it to a Zero-GPU Space. This allows a user's
+        ZeroGPU quota to be tracked and used by the underlying Space. For the x-ip-token header to be present,
+        this method needs to be called when a Gradio app's LocalContext is defined. i.e. this method
+        cannot be called when the Gradio Client is instantiated, but must be called from inside a Gradio app's
+        prediction function.
+        """
+        if not self.space_id:
+            return headers
+        try:
+            from gradio.context import LocalContext
+        except (
+            ImportError
+        ):  # this is not running within a Gradio app as Gradio is not installed
+            return headers
+        request = LocalContext.request.get()
+        if request and hasattr(request, "headers") and "x-ip-token" in request.headers:
+            headers["x-ip-token"] = request.headers["x-ip-token"]
+        return headers
+
     def _render_endpoints_info(
         self,
         name_or_index: str | int,
@@ -742,7 +798,7 @@ class Client:
                 default_value = info.get("parameter_default")
                 default_value = utils.traverse(
                     default_value,
-                    lambda x: f"handle_file(\"{x['url']}\")",
+                    lambda x: f'handle_file("{x["url"]}")',
                     utils.is_file_obj_with_meta,
                 )
                 default_info = (
@@ -839,6 +895,10 @@ class Client:
         return huggingface_hub.space_info(space, token=self.hf_token).host  # type: ignore
 
     def _login(self, auth: tuple[str, str]):
+        """
+        Logs in to `utils.LOGIN_URL` using provided `auth` credentials.
+        Warning: This method overwrites `self.cookies`.
+        """
         resp = httpx.post(
             urllib.parse.urljoin(self.src, utils.LOGIN_URL),
             data={"username": auth[0], "password": auth[1]},
@@ -865,6 +925,16 @@ class Client:
             **self.httpx_kwargs,
         )
         if r.is_success:
+            # Cookies are sometimes needed to correctly route requests if the Gradio app is
+            # running on multiple replicas e.g. using cookie session-affinity in Kubernetes.
+            # This approach attaches cookies from the first response to subsequent requests
+            # without overriding existing cookies.
+            new_cookies = {
+                name: value
+                for name, value in r.cookies.items()
+                if value is not None and name not in self.cookies
+            }
+            self.cookies.update(new_cookies)
             return r.json()
         elif r.status_code == 401:
             raise AuthenticationError(
@@ -974,7 +1044,7 @@ class Client:
             space_id = huggingface_hub.get_full_repo_name(to_id, token=hf_token)
         else:
             if self.space_id:
-                space_id = f'{self.space_id.split("/")[1]}-gradio-discord-bot'
+                space_id = f"{self.space_id.split('/')[1]}-gradio-discord-bot"
             else:
                 space_id = f"gradio-discord-bot-{secrets.token_hex(4)}"
             space_id = huggingface_hub.get_full_repo_name(space_id, token=hf_token)
@@ -1123,14 +1193,15 @@ class Endpoint:
     def __str__(self):
         return self.__repr__()
 
-    def make_end_to_end_fn(self, helper: Communicator | None = None):
+    def make_end_to_end_fn(self, helper: Communicator):
         _predict = self.make_predict(helper)
 
         def _inner(*data):
             if not self.is_valid:
                 raise utils.InvalidAPIEndpointError()
 
-            data = self.insert_empty_state(*data)
+            if self.client._skip_components:
+                data = self.insert_empty_state(*data)
             data = self.process_input_files(*data)
             predictions = _predict(*data)
             predictions = self.process_predictions(*predictions)
@@ -1218,7 +1289,7 @@ class Endpoint:
 
         return _cancel
 
-    def make_predict(self, helper: Communicator | None = None):
+    def make_predict(self, helper: Communicator):
         def _predict(*data) -> tuple:
             data = {
                 "data": data,
@@ -1234,7 +1305,9 @@ class Endpoint:
             if self.protocol == "sse":
                 result = self._sse_fn_v0(data, hash_data, helper)  # type: ignore
             elif self.protocol in ("sse_v1", "sse_v2", "sse_v2.1", "sse_v3"):
-                event_id = self.client.send_data(data, hash_data, self.protocol)
+                event_id = self.client.send_data(
+                    data, hash_data, self.protocol, helper.request_headers
+                )
                 self.client.pending_event_ids.add(event_id)
                 self.client.pending_messages_per_event[event_id] = []
                 helper.event_id = event_id
@@ -1249,10 +1322,8 @@ class Endpoint:
                         "verbose error reporting. To enable, set show_error=True in launch()."
                     )
                 else:
-                    raise AppError(
-                        "The upstream Gradio app has raised an exception: "
-                        + result["error"]
-                    )
+                    message = result.pop("error")
+                    raise AppError(message=message, **result)
 
             try:
                 output = result["data"]
@@ -1374,7 +1445,7 @@ class Endpoint:
         return {
             "path": file_path,
             "orig_name": utils.strip_invalid_filename_characters(orig_name.name),
-            "meta": {"_type": "gradio.FileData"} if orig_name.suffix else None,
+            "meta": {"_type": "gradio.FileData"},
         }
 
     def _download_file(self, x: dict) -> str:
@@ -1451,8 +1522,8 @@ class Job(Future):
     submitted by the Gradio client. This class is not meant to be instantiated directly, but rather
     is created by the Client.submit() method.
 
-    A Job object includes methods to get the status of the prediction call, as well to get the outputs of
-    the prediction call. Job objects are also iterable, and can be used in a loop to get the outputs
+    A Job object includes methods to get the status of the prediction call, as well to get the outputs
+    of the prediction call. Job objects are also iterable, and can be used in a loop to get the outputs
     of prediction calls as they become available for generator endpoints.
     """
 
@@ -1497,6 +1568,21 @@ class Job(Future):
                 ):
                     raise StopIteration()
                 time.sleep(0.001)
+
+    async def __aiter__(self) -> AsyncGenerator[Update, None]:
+        """Async iterator that yields all updates from the communicator.updates queue."""
+        if not self.communicator:
+            return
+
+        while True:
+            get = self.communicator.updates.get()
+            try:
+                update = await asyncio.wait_for(get, timeout=0.5)
+                yield update
+            except asyncio.TimeoutError:
+                if self.done():
+                    return
+                continue
 
     def result(self, timeout: float | None = None) -> Any:
         """

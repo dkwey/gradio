@@ -20,6 +20,7 @@ from gradio.components.color_picker import ColorPicker
 from gradio.components.dataframe import Dataframe
 from gradio.components.dataset import Dataset
 from gradio.components.datetime import DateTime
+from gradio.components.deep_link_button import DeepLinkButton
 from gradio.components.download_button import DownloadButton
 from gradio.components.dropdown import Dropdown
 from gradio.components.duplicate_button import DuplicateButton
@@ -31,6 +32,7 @@ from gradio.components.highlighted_text import HighlightedText
 from gradio.components.html import HTML
 from gradio.components.image import Image
 from gradio.components.image_editor import ImageEditor
+from gradio.components.imageslider import ImageSlider
 from gradio.components.json_component import JSON
 from gradio.components.label import Label
 from gradio.components.login_button import LoginButton
@@ -44,7 +46,7 @@ from gradio.components.plot import Plot
 from gradio.components.radio import Radio
 from gradio.components.slider import Slider
 from gradio.components.state import State
-from gradio.components.textbox import Textbox
+from gradio.components.textbox import InputHTMLAttributes, Textbox
 from gradio.components.timer import Timer
 from gradio.components.upload_button import UploadButton
 from gradio.components.video import Video
@@ -118,7 +120,10 @@ __all__ = [
     "StreamingInput",
     "StreamingOutput",
     "ImageEditor",
+    "ImageSlider",
     "ParamViewer",
     "MultimodalTextbox",
     "NativePlot",
+    "DeepLinkButton",
+    "InputHTMLAttributes",
 ]

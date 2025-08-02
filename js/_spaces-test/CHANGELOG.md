@@ -4,6 +4,97 @@
 
 ### Dependency updates
 
+- @gradio/client@1.15.7
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.6
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.5
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.4
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.3
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.2
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.1
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.15.0
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.14.2
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.14.1
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.14.0
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.13.1
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.13.0
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/theme@0.4.0
+- @gradio/client@1.12.0
+
+## 0.0.1
+
+### Dependency updates
+
+- @gradio/client@1.11.0
+
+## 0.0.1
+
+### Dependency updates
+
 - @gradio/client@1.10.0
 
 ## 0.0.1

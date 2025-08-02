@@ -2,7 +2,7 @@
 	import { default as Info } from "./Info.svelte";
 	export let show_label = true;
 	export let info: string | undefined = undefined;
-	export let root: string;
+	export let rtl = false;
 </script>
 
 <span
@@ -10,11 +10,12 @@
 	class:hide={!show_label}
 	class:has-info={info != null}
 	data-testid="block-info"
+	dir={rtl ? "rtl" : "ltr"}
 >
 	<slot />
 </span>
 {#if info}
-	<Info {root} {info} />
+	<Info {info} />
 {/if}
 
 <style>
@@ -37,6 +38,10 @@
 		font-weight: var(--block-title-text-weight);
 		font-size: var(--block-title-text-size);
 		line-height: var(--line-sm);
+	}
+
+	span[dir="rtl"] {
+		display: block;
 	}
 
 	.hide {
